@@ -143,9 +143,9 @@ async function getUserSubmissions(userID, minTier = DEFAULT_MIN_TIER, maxTier = 
         }
 
         for (const submission of response.submissions) {
-            if (submission.Enjoyment == null) {
-                continue;
-            }
+            // if (submission.Enjoyment == null) {
+            //     continue;
+            // }
 
             enjMap.set(submission.Level.ID, submission.Enjoyment);
         }
