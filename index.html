@@ -1,16 +1,24 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Geometry Dash Level Recommender</title>
-  </head>
-  <body>
-    <div id="app">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="stylesheet" href="/styles/style.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Geometry Dash Level Recommender</title>
+    </head>
+    <body>
+        <div id="app">
+            <form id="form">
+                <input type="text" id="username-field" name="username">
+                <button type="submit" id="submit-button">Retrieve Ratings</button>
+            </form>
 
-    </div>
-    
-    <script type="module" src="/src/main.js"></script>
-  </body>
+            <div id="error-container">
+                <span id="error-message-text"></span>
+            </div>
+        </div>
+        
+        <script type="module" src="/src/main.js"></script>
+    </body>
 </html>

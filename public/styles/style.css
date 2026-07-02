@@ -294,3 +294,9 @@ code {
     border-right-color: var(--border);
   }
 }
+
+/* */
+
+#error-message-text {
+  color: red;
+}
