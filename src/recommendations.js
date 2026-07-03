@@ -33,25 +33,25 @@ export function getRandomInt(min, max) {
  */
 export function getNSmallest(iterable, n, func = (a) => a) {
     const resultArr = [];
-    let largestElemInSet = null;
-    let largestBasisInSet = null;
+    let largestElem = null;
+    let largestBasis = null;
     
     for (const element of iterable) {
         const basis = func(element);
 
-        if (resultArr.length < n || (largestElemInSet != null && basis < largestBasisInSet)) {
+        if (resultArr.length < n || (largestElem != null && basis < largestBasis)) {
             resultArr.push(element);
 
-            if (largestElemInSet == null) {
-                largestElemInSet = element; 
-                largestBasisInSet = func(element);
+            if (largestElem == null) {
+                largestElem = element; 
+                largestBasis = func(element);
                 continue;
             }
 
             // kick out overflowing element
             if (resultArr.length > n) {
                 for (let i = 0; i < resultArr.length; i++) {
-                    if (func(resultArr[i]) >= largestBasisInSet) {
+                    if (func(resultArr[i]) >= largestBasis) {
                         resultArr.splice(i, 1);
                         break;
                     }
@@ -59,13 +59,13 @@ export function getNSmallest(iterable, n, func = (a) => a) {
             }
 
             // recalculate largestBasisInSet and largestElemInSet
-            largestBasisInSet = null;
-            largestElemInSet = null;
+            largestBasis = null;
+            largestElem = null;
             for (const setElem of resultArr) {
                 const thisBasis = func(setElem);
-                if (largestBasisInSet == null || thisBasis > largestBasisInSet) {
-                    largestBasisInSet = thisBasis;
-                    largestElemInSet = setElem;
+                if (largestBasis == null || thisBasis > largestBasis) {
+                    largestBasis = thisBasis;
+                    largestElem = setElem;
                 }
             }
         }
@@ -255,37 +255,53 @@ class DataManager {
     }
 
     getMostCompatiblePlayers(limit = 10, minRatings = 5) {
-        const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
-        otherUsersArr.sort((a, b) => {
+        // const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
+        // otherUsersArr.sort((a, b) => {
+        //     if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
+        //         return 1;
+        //     }
+
+        //     if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
+        //         return -1;
+        //     }
+
+        //     return b.calculateCompatThreshold() - a.calculateCompatThreshold();
+        // });
+        // otherUsersArr.splice(limit);
+        // return otherUsersArr;
+
+        return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
-                return 1;
+                return Infinity;
             }
 
-            if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
-                return -1;
-            }
-
-            return b.calculateCompatThreshold() - a.calculateCompatThreshold();
+            return -1 * a.calculateCompatThreshold();
         });
-        otherUsersArr.splice(limit);
-        return otherUsersArr;
     }
 
     getLeastCompatiblePlayers(limit = 10, minRatings = 5) {
-        const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
-        otherUsersArr.sort((a, b) => {
+        // const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
+        // otherUsersArr.sort((a, b) => {
+        //     if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
+        //         return 1;
+        //     }
+
+        //     if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
+        //         return -1;
+        //     }
+
+        //     return a.calculateCompatThreshold() - b.calculateCompatThreshold();
+        // });
+        // otherUsersArr.splice(limit);
+        // return otherUsersArr;
+
+        return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
-                return 1;
+                return Infinity;
             }
 
-            if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
-                return -1;
-            }
-
-            return a.calculateCompatThreshold() - b.calculateCompatThreshold();
+            return a.calculateCompatThreshold();
         });
-        otherUsersArr.splice(limit);
-        return otherUsersArr;
     }
 
     addWeight(levelID, weight) {
