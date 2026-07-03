@@ -31,6 +31,16 @@ const MAX_OTHER_USER_SUBMISSIONS = 50;
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "recency";
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 
+const trackers = {
+    numAPICalls: 0,
+    numAPISuccesses: 0,
+    numAPIErrors: 0
+}
+
+const flags = {
+
+};
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 class APIError extends Error {
@@ -73,9 +83,11 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
     }
 
     const response = await fetch(resultURL);
+    trackers.numAPICalls++;
 
     if (!response.ok) {
         const contentType = response.headers.get("content-type");
+        trackers.numAPIErrors++;
 
         // if (response.status === 429 && !retried) {
         //     console.log("rate limited... waiting 0 seconds");
@@ -92,6 +104,7 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
         }
     }
 
+    trackers.numAPISuccesses++;
     return await response.json();
 }
 

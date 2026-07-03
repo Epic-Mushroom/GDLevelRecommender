@@ -26,6 +26,56 @@ export function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min) + min);
 }
 
+/**
+ * 
+ * @param {iterable} iterable 
+ * @param {Function} func a function that is called on each element to use the result as the basis for sorting
+ */
+export function getNSmallest(iterable, n, func = (a) => a) {
+    const resultArr = [];
+    let largestElemInSet = null;
+    let largestBasisInSet = null;
+    
+    for (const element of iterable) {
+        const basis = func(element);
+
+        if (resultArr.length < n || (largestElemInSet != null && basis < largestBasisInSet)) {
+            resultArr.push(element);
+
+            if (largestElemInSet == null) {
+                largestElemInSet = element; 
+                largestBasisInSet = func(element);
+                continue;
+            }
+
+            // kick out overflowing element
+            if (resultArr.length > n) {
+                for (let i = 0; i < resultArr.length; i++) {
+                    if (func(resultArr[i]) >= largestBasisInSet) {
+                        resultArr.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            // recalculate largestBasisInSet and largestElemInSet
+            largestBasisInSet = null;
+            largestElemInSet = null;
+            for (const setElem of resultArr) {
+                const thisBasis = func(setElem);
+                if (largestBasisInSet == null || thisBasis > largestBasisInSet) {
+                    largestBasisInSet = thisBasis;
+                    largestElemInSet = setElem;
+                }
+            }
+        }
+    }
+
+    resultArr.sort((a, b) => func(a) - func(b));
+
+    return resultArr;
+}
+
 export function calculateWeight(enjoyment, compatThreshold) {
     const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
     const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
@@ -259,9 +309,13 @@ class DataManager {
                 }
 
                 const calculatedWeight = calculateWeight(enjRating, otherUserEnjProfile.compatThreshold);
-                this.addWeight(levelID, calculateWeight);
+                this.addWeight(levelID, calculatedWeight);
             }
         }
+    }
+
+    getMostRecommendedLevels(limit = 10) {
+
     }
 }
 
