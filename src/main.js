@@ -19,7 +19,16 @@ const MAX_USER_LEVELS_PER_ENJ_RATING = 10;
 // at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
 // a globillion requests total and we don't want that 
 const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 120; 
+// for sorting when gathering submissions from level page
 const DEFAULT_SUBMISSIONS_SORT = "dateAdded";
+const DEFAULT_SUBMISSIONS_SORT_DIRECTION = "asc";
+// up to [this value] users will have their ratings collected
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 12;
+// up to [this value] levels from other users will be tracked
+const MAX_OTHER_USER_SUBMISSIONS = 50;
+// for sorting when gathering submissions from other users' pages
+const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "recency";
+const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -113,7 +122,7 @@ async function getUserProfile(userID) {
 async function getLevelSubmissions(levelID, pageNum) {
     const response = await getAPIResponse(["level", levelID, "submissions"], {
         sort: DEFAULT_SUBMISSIONS_SORT,
-        sortDirection: "desc",
+        sortDirection: DEFAULT_SUBMISSIONS_SORT_DIRECTION,
         twoPlayer: false,
         progressFilter: "victors",
         limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
@@ -127,22 +136,25 @@ async function getLevelSubmissions(levelID, pageNum) {
  * 
  * @param {string} username 
  */
-async function registerUserSubmissions(userID, isOther = false, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
-    const userProfile = await getUserProfile(userID);    
-    const numSubmissions = userProfile.SubmissionCount;
-    const username = userProfile.Name;
-    const numPages = Math.ceil(numSubmissions * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE);
-    console.log(`attempting to register ${numSubmissions} submissions for ${username}`);
+async function registerUserSubmissions(userID, username = null, isOther = false, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = "levelRating") {
+    if (username == null) {
+        const userProfile = await getUserProfile(userID);  
+        username = userProfile.Name;
+    }
+
+    console.log(`attempting to register submissions for ${username}`);
 
     let numSubmissionsRegistered = 0;
 
-    for (let pageNum = 0; pageNum < numPages; pageNum++) {
+    for (let pageNum = 0; pageNum < 999; pageNum++) {
+        let limitReached = false;
+
         const response = await getAPIResponse(["user", userID, "submissions"], {
             minTier: minTier,
             maxTier: maxTier,
             limit: NUM_SUBMISSIONS_PER_USER_PAGE,
             page: pageNum,
-            sort: "levelRating",
+            sort: sortMethod,
             sortDirection: "desc",
             onlyIncomplete: false,
             pending: false
@@ -162,15 +174,23 @@ async function registerUserSubmissions(userID, isOther = false, minTier = DEFAUL
             }
 
             numSubmissionsRegistered++;
+            if (numSubmissionsRegistered >= limit) {
+                limitReached = true;
+                break;
+            }
         }
 
-        console.log(`${numSubmissionsRegistered} submissions registered so far`);
+        if (limitReached) {
+            break;
+        }
+
+        // console.log(`${numSubmissionsRegistered} submissions registered so far`);
     }
 
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
 
-async function registerOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
+async function registerAllOtherUserCommonSubmissions() {
     let numTotalSubmissionsRegistered = 0;
     const ratingsPerEnjoyment = new Map(Object.entries({
         0: 0,
@@ -186,6 +206,8 @@ async function registerOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier 
         10: 0
     }));
 
+    console.log("attempting to register all other users' common submissions");
+
     for (const levelID of dataManager.mainUserEnjProfile.enjMap.keys()) {
         let numSubmissionsThisLevelRegistered = 0;
 
@@ -193,7 +215,7 @@ async function registerOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier 
             const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
 
             if (mainUserEnjRating == null || ratingsPerEnjoyment.get(mainUserEnjRating) >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-                console.log(`skipping getting other user submissions from level ID ${levelID}`);
+                // console.log(`skipping getting other user submissions from level ID ${levelID}`);
                 continue;
             }
 
@@ -219,15 +241,30 @@ async function registerOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier 
             }
 
             if (err.status === 429) {
-                console.log(`halting gathering submissions from level ID ${levelID} due to rate limit`)
+                // console.log(`halting gathering submissions from level ID ${levelID} due to rate limit`)
             }
 
         }
 
-        console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
+        // console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
     }
 
     console.log(`registered ${numTotalSubmissionsRegistered} submissions from all other users`);
+}
+
+async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, usersLimit = MAX_OTHER_USERS_TO_COLLECT_FROM, submissionsLimit = MAX_OTHER_USER_SUBMISSIONS, sortMethod = DEFAULT_OTHER_USER_SUBMISSIONS_SORT) {
+    const otherUsersArr = [];
+    otherUsersArr.push(...dataManager.getLeastCompatiblePlayers(usersLimit / 2));
+    otherUsersArr.push(...dataManager.getMostCompatiblePlayers(usersLimit - usersLimit / 2));
+    
+    const promiseArr = [];
+
+    for (const otherUserEnjProfile of otherUsersArr) {
+        console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
+        promiseArr.push(registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier, maxTier, submissionsLimit, sortMethod));
+    }
+
+    await Promise.all(promiseArr);
 }
 
 async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
@@ -247,11 +284,14 @@ async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier 
         dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, userProfile.Name, false);
         console.log(`set ${userProfile.Name}'s enj profile as the main enj profile`);
 
-        await registerUserSubmissions(userID, false, minTier, maxTier);
-        await registerOtherUserSubmissions();
+        await registerUserSubmissions(userID, userProfile.name, false, minTier, maxTier);
 
+        await registerAllOtherUserCommonSubmissions();
         dataManager.calculateCompatsAndThresholds();
         console.log("calculated compatibilities and thresholds");
+
+        await registerAllOtherUserSubmissions(minTier, maxTier);
+        console.log("registered all other user submissions");
 
     } catch (err) {
         errorMsg(errorMessageText, err.message);
