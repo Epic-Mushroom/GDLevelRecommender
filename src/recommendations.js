@@ -12,7 +12,7 @@ export function getRandomInt(min, max) {
 
 export class EnjoymentProfile {
     constructor(userID = 92, username = DEFAULT_USERNAME, isOther = false) {
-        this.userID = 92;
+        this.userID = userID;
         this.username = username;
         this.isOther = isOther;
 
@@ -75,6 +75,12 @@ export class EnjoymentProfile {
             const enjDifference = Math.abs(enjoyment - mainUserEnjoyment);
 
             totalCompat += BASE_COMPAT - ENJ_DIFFERENCE_FACTOR * enjDifference;
+            numCommonLevels++;
+        }
+
+        if (numCommonLevels === 0) {
+            // can't determine compat if there are no levels in common
+            return null;
         }
 
         this.compat = totalCompat * 1.0 / numCommonLevels;
@@ -90,6 +96,12 @@ export class EnjoymentProfile {
 
         this.compat = this.calculateCompat();
         
+        if (this.compat == null) {
+            // should only rarely be the case (happens if there are no levels in common)
+            this.compatThreshold = null;
+            return null;
+        }
+
         if (dataManager.compatArr.length === 0) {
             return 0;
         }
@@ -97,13 +109,13 @@ export class EnjoymentProfile {
         // assumes all compats are already sorted in ascending order
         for (let i = 0; i < dataManager.compatArr.length; i++) {
             const compatValue = dataManager.compatArr[i];
-            if (compatValue >= this.compat) {
+            if (compatValue != null && compatValue >= this.compat) {
                 this.compatThreshold = (100.0 * i) / dataManager.compatArr.length;
             }
 
         }
 
-        return (this.compatThreshold != null) ? this.compatThreshold : 100.0;
+        return this.compatThreshold;
     }
 }
 
@@ -128,7 +140,7 @@ class DataManager {
     }
 
     addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment) {
-        if (this.mainUserEnjProfile.isLevelCompleted(levelID)) {
+        if (otherUserID === this.mainUserEnjProfile.userID) {
             return null;
         }
 
@@ -136,7 +148,7 @@ class DataManager {
             this.otherUserEnjProfileMap.set(otherUserID, new EnjoymentProfile(otherUserID, otherUsername, true));
         }
 
-        this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment);
+        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment);
     }
 
     calculateCompats() {
@@ -146,7 +158,7 @@ class DataManager {
             this.compatArr.push(otherUserEnjProfile.calculateCompat());
         }
 
-        this.compatArr.sort();
+        this.compatArr.sort((a, b) => a - b);
     }
 }
 

@@ -4,10 +4,20 @@ import {dataManager, getRandomInt} from "./recommendations.js"
 const GDDL_API_URL = "https://gdladder.com/api";
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
-const NUM_SUBMISSIONS_PER_PAGE = 25;
+const RATE_LIMIT_DELAY_MS = 0;
+
+const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
+const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 
 const DEFAULT_MIN_TIER = 1;
 const DEFAULT_MAX_TIER = 39;
+
+// at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
+// a globillion requests total and we don't want that 
+const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 120; 
+const DEFAULT_SUBMISSIONS_SORT = "dateAdded";
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 class APIError extends Error {
     /**
@@ -36,33 +46,7 @@ function errorMsg(errorMessageText, message) {
  * @param {Array<string>} pathVariables 
  * @param {Object} queryParams 
  */
-async function getAPIResponseText(pathVariables, queryParams) {
-    let resultURL = PROXY_URL;
-
-    for (const variable of pathVariables) {
-        resultURL += `/${encodeURIComponent(variable)}`;
-    }
-
-    const query = new URLSearchParams(queryParams).toString();
-    if (query.length > 0) {
-        resultURL += `?${query}`;
-    }
-
-    const response = await fetch(resultURL);
-
-    if (!response.ok) {
-        throw new APIError(response.status, `${response.status}: ${(await response.json()).message}`);
-    }
-
-    return await response.text();
-}
-
-/**
- * 
- * @param {Array<string>} pathVariables 
- * @param {Object} queryParams 
- */
-async function getAPIResponse(pathVariables, queryParams) {
+async function getAPIResponse(pathVariables, queryParams, retried = false) {
     let resultURL = PROXY_URL;
 
     for (const variable of pathVariables) {
@@ -79,11 +63,17 @@ async function getAPIResponse(pathVariables, queryParams) {
     if (!response.ok) {
         const contentType = response.headers.get("content-type");
 
+        if (response.status === 429 && !retried) {
+            console.log("rate limited... waiting 0 seconds");
+            await sleep(RATE_LIMIT_DELAY_MS);
+            return await getAPIResponse(pathVariables, queryParams, true);
+        }
+
         if (contentType && contentType.includes("application/json")) {
-            throw new APIError(`${response.status}: ${(await response.json()).message}`);
+            throw new APIError(response.status, `${response.status}: ${(await response.json()).message}`);
 
         } else {
-            throw new APIError(`${response.status}: ${await response.text()}`);
+            throw new APIError(response.status, `${response.status}: ${await response.text()}`);
 
         }
     }
@@ -116,6 +106,19 @@ async function getUserProfile(userID) {
     return response;
 }
 
+async function getLevelSubmissions(levelID, pageNum) {
+    const response = await getAPIResponse(["level", levelID, "submissions"], {
+        sort: DEFAULT_SUBMISSIONS_SORT,
+        sortDirection: "desc",
+        twoPlayer: false,
+        progressFilter: "victors",
+        limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
+        page: pageNum
+    });
+
+    return response;
+}
+
 /**
  * 
  * @param {string} username 
@@ -124,7 +127,7 @@ async function registerUserSubmissions(userID, isOther = false, minTier = DEFAUL
     const userProfile = await getUserProfile(userID);    
     const numSubmissions = userProfile.SubmissionCount;
     const username = userProfile.Name;
-    const numPages = Math.ceil(numSubmissions * 1.0 / NUM_SUBMISSIONS_PER_PAGE);
+    const numPages = Math.ceil(numSubmissions * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE);
     console.log(`attempting to register ${numSubmissions} submissions for ${username}`);
 
     let numSubmissionsRegistered = 0;
@@ -133,7 +136,7 @@ async function registerUserSubmissions(userID, isOther = false, minTier = DEFAUL
         const response = await getAPIResponse(["user", userID, "submissions"], {
             minTier: minTier,
             maxTier: maxTier,
-            limit: NUM_SUBMISSIONS_PER_PAGE,
+            limit: NUM_SUBMISSIONS_PER_USER_PAGE,
             page: pageNum,
             sort: "levelRating",
             sortDirection: "desc",
@@ -167,6 +170,40 @@ async function registerUserSubmissions(userID, isOther = false, minTier = DEFAUL
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
 
+async function registerOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
+    let numTotalSubmissionsRegistered = 0;
+
+    for (const levelID of dataManager.mainUserEnjProfile.enjMap.keys()) {
+        let numSubmissionsThisLevelRegistered = 0;
+
+        try {
+            for (let pageNum = 0; pageNum < Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE); pageNum++) {
+                const response = await getLevelSubmissions(levelID, pageNum);
+
+                for (const submission of response.submissions) {
+                    dataManager.addOtherUserEnjRating(submission.UserID, submission.User.Name, levelID, submission.Enjoyment);
+                    numSubmissionsThisLevelRegistered++;
+                    numTotalSubmissionsRegistered++;
+                }
+            }
+
+        } catch (err) {
+            if (err.name != "APIError") {
+                throw err;
+            }
+
+            if (err.status === 429) {
+                console.log(`halting gathering submissions from level ID ${levelID} due to rate limit`)
+            }
+
+        }
+
+        console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
+    }
+
+    console.log(`registered ${numTotalSubmissionsRegistered} submissions from all other users`);
+}
+
 async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
     try {
         const userID = await getUserID(username);
@@ -185,6 +222,9 @@ async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier 
         console.log(`set ${userProfile.Name}'s enj profile as the main enj profile`);
 
         await registerUserSubmissions(userID, false, minTier, maxTier);
+        await registerOtherUserSubmissions();
+
+        dataManager.calculateCompats();
 
     } catch (err) {
         errorMsg(errorMessageText, err.message);
