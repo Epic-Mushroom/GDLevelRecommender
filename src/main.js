@@ -2,7 +2,7 @@ import * as recs from "./recommendations.js";
 import {dataManager, getRandomInt} from "./recommendations.js"
 
 const GDDL_API_URL = "https://gdladder.com/api";
-const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
+const PROXY_URL_1 = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
 const RATE_LIMIT_DELAY_MS = 0;
 
@@ -60,7 +60,7 @@ function errorMsg(errorMessageText, message) {
  * @param {Object} queryParams 
  */
 async function getAPIResponse(pathVariables, queryParams, retried = false) {
-    let resultURL = PROXY_URL;
+    let resultURL = GDDL_API_URL;
 
     for (const variable of pathVariables) {
         resultURL += `/${encodeURIComponent(variable)}`;
@@ -292,6 +292,9 @@ async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier 
 
         await registerAllOtherUserSubmissions(minTier, maxTier);
         console.log("registered all other user submissions");
+
+        dataManager.addAllWeights();
+        console.log("added all weights...?");
 
     } catch (err) {
         errorMsg(errorMessageText, err.message);
