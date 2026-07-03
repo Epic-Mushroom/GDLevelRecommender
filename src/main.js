@@ -1,5 +1,5 @@
 import * as recs from "./recommendations.js";
-import {getRandomInt} from "./recommendations.js"
+import {dataManager, getRandomInt} from "./recommendations.js"
 
 const GDDL_API_URL = "https://gdladder.com/api";
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
@@ -120,11 +120,14 @@ async function getUserProfile(userID) {
  * 
  * @param {string} username 
  */
-async function getUserSubmissions(userID, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
-    const numSubmissions = (await getUserProfile(userID)).SubmissionCount;
+async function registerUserSubmissions(userID, isOther = false, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
+    const userProfile = await getUserProfile(userID);    
+    const numSubmissions = userProfile.SubmissionCount;
+    const username = userProfile.Name;
     const numPages = Math.ceil(numSubmissions * 1.0 / NUM_SUBMISSIONS_PER_PAGE);
+    console.log(`attempting to register ${numSubmissions} submissions for ${username}`);
 
-    const enjMap = new Map();
+    let numSubmissionsRegistered = 0;
 
     for (let pageNum = 0; pageNum < numPages; pageNum++) {
         const response = await getAPIResponse(["user", userID, "submissions"], {
@@ -147,35 +150,41 @@ async function getUserSubmissions(userID, minTier = DEFAULT_MIN_TIER, maxTier = 
             //     continue;
             // }
 
-            enjMap.set(submission.Level.ID, submission.Enjoyment);
+            if (isOther) {
+                dataManager.addOtherUserEnjRating(userID, username, submission.Level.ID, submission.Enjoyment);
+
+            } else {
+                dataManager.addMainUserEnjRating(submission.Level.ID, submission.Enjoyment);
+
+            }
+
+            numSubmissionsRegistered++;
         }
+
+        console.log(`${numSubmissionsRegistered} submissions registered so far`);
     }
 
-    return enjMap;
+    console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
 
-async function retrieveUserData(username) {
+async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
     try {
         const userID = await getUserID(username);
 
         if (userID == null) {
-            console.warn("user not found");
-            return;
+            throw new Error("User not found!");
         }
 
         const userProfile = await getUserProfile(userID);
-        const userSubmissions = await getUserSubmissions(userID);
-
         if (userProfile.Name != username) {
             console.warn("found user's name does not match input's username");
+            // might want to display this to the user
         }
 
-        console.log(`retrieved data of ${userProfile.Name}`);
+        dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, userProfile.Name, false);
+        console.log(`set ${userProfile.Name}'s enj profile as the main enj profile`);
 
-        const userSubmissionsArr = Array.from(userSubmissions);
-        console.log(userSubmissionsArr);
-        const randomLevelID = userSubmissionsArr[getRandomInt(0, userSubmissionsArr.length - 1)][0];
-        console.log(`enjoyment submitted for level ID: ${randomLevelID} is ${userSubmissions.get(randomLevelID)}`);
+        await registerUserSubmissions(userID, false, minTier, maxTier);
 
     } catch (err) {
         errorMsg(errorMessageText, err.message);
@@ -201,5 +210,7 @@ form.addEventListener("submit", async (event) => {
         return;
     }
 
-    await retrieveUserData(formData.get("username"));
+    dataManager.reset();
+
+    await getRecommendations(formData.get("username"));
 });
