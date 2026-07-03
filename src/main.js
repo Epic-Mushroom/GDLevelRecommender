@@ -12,6 +12,10 @@ const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 const DEFAULT_MIN_TIER = 1;
 const DEFAULT_MAX_TIER = 39;
 
+// at max how many of the main user's rated levels per enjoyment rating are sent an api request
+// for example if the user has 140 levels rated an 8/10 only [this value] levels will be sent a request
+// this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
+const MAX_USER_LEVELS_PER_ENJ_RATING = 10;
 // at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
 // a globillion requests total and we don't want that 
 const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 120; 
@@ -63,11 +67,11 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
     if (!response.ok) {
         const contentType = response.headers.get("content-type");
 
-        if (response.status === 429 && !retried) {
-            console.log("rate limited... waiting 0 seconds");
-            await sleep(RATE_LIMIT_DELAY_MS);
-            return await getAPIResponse(pathVariables, queryParams, true);
-        }
+        // if (response.status === 429 && !retried) {
+        //     console.log("rate limited... waiting 0 seconds");
+        //     await sleep(RATE_LIMIT_DELAY_MS);
+        //     return await getAPIResponse(pathVariables, queryParams, true);
+        // }
 
         if (contentType && contentType.includes("application/json")) {
             throw new APIError(response.status, `${response.status}: ${(await response.json()).message}`);
@@ -149,10 +153,6 @@ async function registerUserSubmissions(userID, isOther = false, minTier = DEFAUL
         }
 
         for (const submission of response.submissions) {
-            // if (submission.Enjoyment == null) {
-            //     continue;
-            // }
-
             if (isOther) {
                 dataManager.addOtherUserEnjRating(userID, username, submission.Level.ID, submission.Enjoyment);
 
@@ -172,20 +172,46 @@ async function registerUserSubmissions(userID, isOther = false, minTier = DEFAUL
 
 async function registerOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
     let numTotalSubmissionsRegistered = 0;
+    const ratingsPerEnjoyment = new Map(Object.entries({
+        0: 0,
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 0,
+        5: 0,
+        6: 0,
+        7: 0,
+        8: 0,
+        9: 0,
+        10: 0
+    }));
 
     for (const levelID of dataManager.mainUserEnjProfile.enjMap.keys()) {
         let numSubmissionsThisLevelRegistered = 0;
 
         try {
+            const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
+
+            if (mainUserEnjRating == null || ratingsPerEnjoyment.get(mainUserEnjRating) >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+                console.log(`skipping getting other user submissions from level ID ${levelID}`);
+                continue;
+            }
+
             for (let pageNum = 0; pageNum < Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE); pageNum++) {
                 const response = await getLevelSubmissions(levelID, pageNum);
 
                 for (const submission of response.submissions) {
+                    if (submission.Enjoyment == null) {
+                        continue;
+                    }
+
                     dataManager.addOtherUserEnjRating(submission.UserID, submission.User.Name, levelID, submission.Enjoyment);
                     numSubmissionsThisLevelRegistered++;
                     numTotalSubmissionsRegistered++;
                 }
             }
+
+            ratingsPerEnjoyment.set(mainUserEnjRating, ratingsPerEnjoyment.get(mainUserEnjRating) + 1);
 
         } catch (err) {
             if (err.name != "APIError") {
@@ -224,7 +250,8 @@ async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier 
         await registerUserSubmissions(userID, false, minTier, maxTier);
         await registerOtherUserSubmissions();
 
-        dataManager.calculateCompats();
+        dataManager.calculateCompatsAndThresholds();
+        console.log("calculated compatibilities and thresholds");
 
     } catch (err) {
         errorMsg(errorMessageText, err.message);

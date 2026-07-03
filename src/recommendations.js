@@ -89,7 +89,7 @@ export class EnjoymentProfile {
 
     // returns a percentile relating to how much this user is compatible with the main user's enjoyments
     // higher percentile = more useful
-    getCompatThreshold() {
+    calculateCompatThreshold() {
         if (this.compatThreshold != null) {
             return this.compatThreshold;
         }
@@ -110,7 +110,7 @@ export class EnjoymentProfile {
         for (let i = 0; i < dataManager.compatArr.length; i++) {
             const compatValue = dataManager.compatArr[i];
             if (compatValue != null && compatValue >= this.compat) {
-                this.compatThreshold = (100.0 * i) / dataManager.compatArr.length;
+                return this.compatThreshold = (100.0 * i) / dataManager.compatArr.length;
             }
 
         }
@@ -151,7 +151,7 @@ class DataManager {
         return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment);
     }
 
-    calculateCompats() {
+    calculateCompatsAndThresholds() {
         this.compatArr = [];
 
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
@@ -159,6 +159,44 @@ class DataManager {
         }
 
         this.compatArr.sort((a, b) => a - b);
+
+        for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
+            otherUserEnjProfile.calculateCompatThreshold();
+        }
+    }
+
+    getMostCompatiblePlayers(limit = 10, minRatings = 5) {
+        const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
+        otherUsersArr.sort((a, b) => {
+            if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
+                return 1;
+            }
+
+            if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
+                return -1;
+            }
+
+            return b.calculateCompatThreshold() - a.calculateCompatThreshold();
+        });
+        otherUsersArr.splice(limit);
+        return otherUsersArr;
+    }
+
+    getLeastCompatiblePlayers(limit = 10, minRatings = 5) {
+        const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
+        otherUsersArr.sort((a, b) => {
+            if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
+                return 1;
+            }
+
+            if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
+                return -1;
+            }
+
+            return a.calculateCompatThreshold() - b.calculateCompatThreshold();
+        });
+        otherUsersArr.splice(limit);
+        return otherUsersArr;
     }
 }
 
