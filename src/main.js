@@ -16,7 +16,7 @@ const DEFAULT_MAX_TIER = 39;
 // at max how many of the main user's rated levels per enjoyment rating are sent an api request
 // for example if the user has 140 levels rated an 8/10 only [this value] levels will be sent a request
 // this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
-const MAX_USER_LEVELS_PER_ENJ_RATING = 10;
+const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
 // at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
 // a globillion requests total and we don't want that 
 const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 120; 
@@ -206,19 +206,10 @@ async function registerUserSubmissions(userID, username = null, isOther = false,
 
 async function registerAllOtherUserCommonSubmissions() {
     let numTotalSubmissionsRegistered = 0;
-    const ratingsPerEnjoyment = new Map(Object.entries({
-        0: 0,
-        1: 0,
-        2: 0,
-        3: 0,
-        4: 0,
-        5: 0,
-        6: 0,
-        7: 0,
-        8: 0,
-        9: 0,
-        10: 0
-    }));
+    // index = enjoyment
+    const levelsPerEnjoyment = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    
+    const promiseArr = [];
 
     console.log("attempting to register all other users' common submissions");
 
@@ -228,8 +219,11 @@ async function registerAllOtherUserCommonSubmissions() {
         try {
             const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
 
-            if (mainUserEnjRating == null || ratingsPerEnjoyment.get(mainUserEnjRating) >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+            if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
                 // console.log(`skipping getting other user submissions from level ID ${levelID}`);
+                // if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+                //     console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
+                // }
                 continue;
             }
 
@@ -247,7 +241,7 @@ async function registerAllOtherUserCommonSubmissions() {
                 }
             }
 
-            ratingsPerEnjoyment.set(mainUserEnjRating, ratingsPerEnjoyment.get(mainUserEnjRating) + 1);
+            levelsPerEnjoyment[mainUserEnjRating]++;
 
         } catch (err) {
             if (err.name != "APIError") {
@@ -263,6 +257,7 @@ async function registerAllOtherUserCommonSubmissions() {
         // console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
     }
 
+    await Promise.allSettled(promiseArr);
     console.log(`registered ${numTotalSubmissionsRegistered} submissions from all other users`);
 }
 
@@ -278,11 +273,17 @@ async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTi
         promiseArr.push(registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier, maxTier, submissionsLimit, sortMethod));
     }
 
-    await Promise.all(promiseArr);
+    await Promise.allSettled(promiseArr);
 }
 
 async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
     try {
+        let timestamp = Date.now();
+        // index is the stage
+        const timeElapsedPerStage = [];
+
+        // stage 0: collect initial data
+        timestamp = Date.now();
         const userID = await getUserID(username);
 
         if (userID == null) {
@@ -297,18 +298,41 @@ async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier 
 
         dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, userProfile.Name, false);
         console.log(`set ${userProfile.Name}'s enj profile as the main enj profile`);
+        timeElapsedPerStage.push(Date.now() - timestamp);
+        console.log(`STAGE 0 TIME ELAPSED: ${timeElapsedPerStage[0]}ms`);
 
+        // stage 1: registering user submissions
+        timestamp = Date.now();
         await registerUserSubmissions(userID, userProfile.name, false, minTier, maxTier);
+        timeElapsedPerStage.push(Date.now() - timestamp);
+        console.log(`STAGE 1 TIME ELAPSED: ${timeElapsedPerStage[1]}ms`);
 
+        // stage 2: registering all other users' submissions in common
+        timestamp = Date.now();
         await registerAllOtherUserCommonSubmissions();
+        timeElapsedPerStage.push(Date.now() - timestamp);
+        console.log(`STAGE 2 TIME ELAPSED: ${timeElapsedPerStage[2]}ms`);
+
+        // stage 3: calculating compats
+        timestamp = Date.now();
         dataManager.calculateCompatsAndThresholds();
         console.log("calculated compatibilities and thresholds");
+        timeElapsedPerStage.push(Date.now() - timestamp);
+        console.log(`STAGE 3 TIME ELAPSED: ${timeElapsedPerStage[3]}ms`);
 
+        // stage 4: registering the submissions of the collected users
+        timestamp = Date.now();
         await registerAllOtherUserSubmissions(minTier, maxTier);
         console.log("registered all other user submissions");
+        timeElapsedPerStage.push(Date.now() - timestamp);
+        console.log(`STAGE 4 TIME ELAPSED: ${timeElapsedPerStage[4]}ms`);
 
+        // stage 5: registering all level weights
+        timestamp = Date.now();
         dataManager.addAllWeights();
-        console.log("added all weights...?");
+        console.log("added all weights");
+        timeElapsedPerStage.push(Date.now() - timestamp);
+        console.log(`STAGE 5 TIME ELAPSED: ${timeElapsedPerStage[5]}ms`);
 
     } catch (err) {
         errorMsg(errorMessageText, err.message);

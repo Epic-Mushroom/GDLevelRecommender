@@ -255,21 +255,6 @@ class DataManager {
     }
 
     getMostCompatiblePlayers(limit = 10, minRatings = 5) {
-        // const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
-        // otherUsersArr.sort((a, b) => {
-        //     if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
-        //         return 1;
-        //     }
-
-        //     if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
-        //         return -1;
-        //     }
-
-        //     return b.calculateCompatThreshold() - a.calculateCompatThreshold();
-        // });
-        // otherUsersArr.splice(limit);
-        // return otherUsersArr;
-
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
                 return Infinity;
@@ -280,21 +265,6 @@ class DataManager {
     }
 
     getLeastCompatiblePlayers(limit = 10, minRatings = 5) {
-        // const otherUsersArr = Array.from(this.otherUserEnjProfileMap.values());
-        // otherUsersArr.sort((a, b) => {
-        //     if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
-        //         return 1;
-        //     }
-
-        //     if (b.calculateCompatThreshold() == null || b.enjMap.size < minRatings) {
-        //         return -1;
-        //     }
-
-        //     return a.calculateCompatThreshold() - b.calculateCompatThreshold();
-        // });
-        // otherUsersArr.splice(limit);
-        // return otherUsersArr;
-
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
                 return Infinity;
