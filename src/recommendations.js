@@ -4,10 +4,32 @@ const DEFAULT_USERNAME = "EpicMushroom";
 const BASE_COMPAT = 150;
 const ENJ_DIFFERENCE_FACTOR = 50;
 
+// step 1 weight calc formula: B + enjoyment * M
+const STEP_1_WEIGHT_CALC_B = -500;
+const STEP_1_WEIGHT_CALC_M = 100;
+// step 2 weight calc formula: (-1)^X * M * (N * compatThreshold)^P + B
+// X = 0 if step 1's weight > 0, X = 1 otherwise
+// add both steps
+// basically, 
+// if other user likes a level, and high compatibility, increase the weight
+// if other user doesn't like a level, and high compat, decrease the weight
+// if other user likes a level, and low compat, decrease the weight
+// if other user doesn't like a level, and low compat, increase the weight
+const STEP_2_WEIGHT_CALC_M = 1.3;
+const STEP_2_WEIGHT_CALC_N = 1.5;
+const STEP_2_WEIGHT_CALC_P = 1.2;
+const STEP_2_WEIGHT_CALC_B = -260;
+
 export function getRandomInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max) + 1;
     return Math.floor(Math.random() * (max - min) + min);
+}
+
+export function calculateWeight(enjoyment, compatThreshold) {
+    const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
+    const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
+    return step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * compatThreshold) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
 }
 
 export class EnjoymentProfile {
@@ -20,6 +42,9 @@ export class EnjoymentProfile {
         this.compatThreshold = (!isOther) ? 100.0 : null;
 
         this.enjMap = new Map();
+
+        this.leastFavoriteLevelIDs = [];
+        this.favoriteLevelIDs = [];
     }
 
     setUsername(username) {
@@ -28,6 +53,14 @@ export class EnjoymentProfile {
 
     setUserID(ID) {
         this.userID = ID;
+    }
+
+    addLeastFavorite(levelID) {
+        this.leastFavoriteLevelIDs.push(levelID);
+    }
+
+    addFavorite(levelID) {
+        this.favoriteLevelIDs.push(levelID);
     }
 
     getEnjoyment(levelID) {
@@ -133,6 +166,12 @@ class DataManager {
         this.otherUserEnjProfileMap = new Map();
         // just contains the compatibility values of all collected players, used to calculate compat threshold
         this.compatArr = [];
+        /**
+         * level ID's of possible recommendations mapped to their calculated weight and number of enj ratings
+         * used in the calculation of the weight
+         * @type {Map<number, {weight: number, numRatings: number}>}
+         */
+        this.levelWeightsMap = new Map();
     }
 
     addMainUserEnjRating(levelID, enjoyment) {
@@ -197,6 +236,32 @@ class DataManager {
         });
         otherUsersArr.splice(limit);
         return otherUsersArr;
+    }
+
+    addWeight(levelID, weight) {
+        if (this.levelWeightsMap.get(levelID) == null) {
+            this.levelWeightsMap.set(levelID, {weight: weight, numRatings: 1});
+
+        } else {
+            const newWeight = (this.levelWeightsMap.get(levelID).weight * this.levelWeightsMap.get(levelID).numRatings + weight) * (1.0 / (this.levelWeightsMap.get(levelID).numRatings + 1));
+            this.levelWeightsMap.set(levelID, {weight: newWeight, numRatings: this.levelWeightsMap.get(levelID).numRatings + 1})
+
+        }
+
+        return weight;
+    }
+
+    addAllWeights() {
+        for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
+            for (const [levelID, enjRating] of otherUserEnjProfile.enjMap) {
+                if (this.mainUserEnjProfile.compatThreshold == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
+                    continue;
+                }
+
+                const calculatedWeight = calculateWeight(enjRating, otherUserEnjProfile.compatThreshold);
+                this.addWeight(levelID, calculateWeight);
+            }
+        }
     }
 }
 
