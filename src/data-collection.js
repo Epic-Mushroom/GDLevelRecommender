@@ -7,11 +7,37 @@ const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
 const RATE_LIMIT_DELAY_MS = 0;
 
+const DEBUG_USERNAME = "DEBUGDEBUG93229"; // entering this username will use debug data
+
+const SKILLS_MAPPING = new Map([
+    ["Cube", "cu"],
+    ["Ship", "sh"],
+    ["Ball", "b"],
+    ["UFO", "u"],
+    ["Wave", "w"],
+    ["Robot", "r"],
+    ["Spider", "so"],
+    ["Swing", "sw"],
+    ["Nerve Control", "xl"],
+    ["Memory", "limbo"],
+    ["Learny", "l"],
+    ["Duals", "d"],
+    ["Chokepoints", "badgp"],
+    ["High CPS", "wasu"],
+    ["Timings", "heliopolis"],
+    ["Flow", "fl"],
+    ["Overall", "ov"],
+    ["Gimmicky", "g"],
+    ["Fast-Paced", "fast"],
+    ["Slow-Paced", "slow"],
+    [null, "unknown"]
+]);
+
 const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
 const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 
-const DEFAULT_MIN_TIER = 1;
-const DEFAULT_MAX_TIER = 39;
+export const DEFAULT_MIN_TIER = 1;
+export const DEFAULT_MAX_TIER = 39;
 
 // at max how many of the main user's rated levels per enjoyment rating are sent an api request
 // for example if the user has 140 levels rated an 8/10 only [this value] levels will be sent a request
@@ -101,7 +127,7 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
  * 
  * @param {string} username 
  */
-async function getUserID(username) {
+async function requestUserID(username) {
     const response = await getAPIResponse(["user", "search"], {limit: 1, name: username});
 
     if (response.length === 0) {
@@ -116,13 +142,19 @@ async function getUserID(username) {
  * 
  * @param {string} username 
  */
-async function getUserProfile(userID) {
+async function requestUserProfile(userID) {
     const response = await getAPIResponse(["user", userID], {});
 
     return response;
 }
 
-async function getLevelSubmissions(levelID, pageNum) {
+export async function requestLevelInfo(levelID) {
+    const response = await getAPIResponse(["level", levelID], {});
+
+    return response;
+}
+
+async function requestLevelSubmissions(levelID, pageNum) {
     const response = await getAPIResponse(["level", levelID, "submissions"], {
         sort: DEFAULT_SUBMISSIONS_SORT,
         sortDirection: DEFAULT_SUBMISSIONS_SORT_DIRECTION,
@@ -135,13 +167,32 @@ async function getLevelSubmissions(levelID, pageNum) {
     return response;
 }
 
+async function requestLevelSkills(levelID) {
+    const response = await getAPIResponse(["level", levelID, "tags"], {});
+
+    return response;
+}
+
+// reformats the API response into something more usable
+export async function getLevelSkills(levelID) {
+    const tags = await requestLevelSkills(levelID);
+    const skillsMap = new Map(); // each skill by id mapped to num of votes
+
+    for (const tag of tags) {
+        const skillName = SKILLS_MAPPING.get(tag.Tag.Name);
+        skillsMap.set(skillName, tag.ReactCount);
+    }
+
+    return skillsMap;
+}
+
 /**
  * 
  * @param {string} username 
  */
 async function registerUserSubmissions(userID, username = null, isOther = false, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = "levelRating") {
     if (username == null) {
-        const userProfile = await getUserProfile(userID);  
+        const userProfile = await requestUserProfile(userID);  
         username = userProfile.Name;
     }
 
@@ -169,10 +220,10 @@ async function registerUserSubmissions(userID, username = null, isOther = false,
 
         for (const submission of response.submissions) {
             if (isOther) {
-                dataManager.addOtherUserEnjRating(userID, username, submission.Level.ID, submission.Enjoyment);
+                dataManager.addOtherUserEnjRating(userID, username, submission.Level.ID, submission.Enjoyment, submission.Level.Rating);
 
             } else {
-                dataManager.addMainUserEnjRating(submission.Level.ID, submission.Enjoyment);
+                dataManager.addMainUserEnjRating(submission.Level.ID, submission.Enjoyment, submission.Level.Rating);
 
             }
 
@@ -202,7 +253,7 @@ async function registerAllOtherUserCommonSubmissions() {
 
     console.log("attempting to register all other users' common submissions");
 
-    for (const levelID of dataManager.mainUserEnjProfile.enjMap.keys()) {
+    for (const levelID of dataManager.mainUserEnjProfile.ratingMap.keys()) {
         let numSubmissionsThisLevelRegistered = 0;
 
         try {
@@ -217,7 +268,7 @@ async function registerAllOtherUserCommonSubmissions() {
             }
 
             for (let pageNum = 0; pageNum < Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE); pageNum++) {
-                const response = await getLevelSubmissions(levelID, pageNum);
+                const response = await requestLevelSubmissions(levelID, pageNum);
 
                 for (const submission of response.submissions) {
                     if (submission.Enjoyment == null) {
@@ -269,15 +320,23 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     // index is the stage
     const timeElapsedPerStage = [];
 
+    if (username === DEBUG_USERNAME) {
+        dataManager.useDebugData();
+
+        dataManager.calculateCompatsAndThresholds();
+        dataManager.addAllWeights();
+        return dataManager.getMostRecommendedLevels();
+    }
+
     // stage 0: collect initial data
     let timestamp = Date.now();
-    const userID = await getUserID(username);
+    const userID = await requestUserID(username);
 
     if (userID == null) {
         throw new Error("User not found! Make sure you have a GDDL account with that name");
     }
 
-    const userProfile = await getUserProfile(userID);
+    const userProfile = await requestUserProfile(userID);
     if (userProfile.Name != username) {
         console.warn("found user's name does not match input's username");
         // might want to display this to the user
@@ -290,7 +349,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 1: registering user submissions
     timestamp = Date.now();
-    await registerUserSubmissions(userID, userProfile.name, false, minTier, maxTier);
+    await registerUserSubmissions(userID, userProfile.name, false); // intentionally leaving out min and max tier to get better user tastes
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 1 TIME ELAPSED: ${timeElapsedPerStage[1]}ms`);
 
