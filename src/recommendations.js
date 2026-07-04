@@ -1,3 +1,5 @@
+import {getRandomInt, getNSmallest} from "./utils.js";
+
 const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
 
@@ -20,62 +22,6 @@ const STEP_2_WEIGHT_CALC_N = 1.5;
 const STEP_2_WEIGHT_CALC_P = 1.2;
 const STEP_2_WEIGHT_CALC_B = -260;
 
-export function getRandomInt(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max) + 1;
-    return Math.floor(Math.random() * (max - min) + min);
-}
-
-/**
- * 
- * @param {iterable} iterable 
- * @param {Function} func a function that is called on each element to use the result as the basis for sorting
- */
-export function getNSmallest(iterable, n, func = (a) => a) {
-    const resultArr = [];
-    let largestElem = null;
-    let largestBasis = null;
-    
-    for (const element of iterable) {
-        const basis = func(element);
-
-        if (resultArr.length < n || (largestElem != null && basis < largestBasis)) {
-            resultArr.push(element);
-
-            if (largestElem == null) {
-                largestElem = element; 
-                largestBasis = func(element);
-                continue;
-            }
-
-            // kick out overflowing element
-            if (resultArr.length > n) {
-                for (let i = 0; i < resultArr.length; i++) {
-                    if (func(resultArr[i]) >= largestBasis) {
-                        resultArr.splice(i, 1);
-                        break;
-                    }
-                }
-            }
-
-            // recalculate largestBasisInSet and largestElemInSet
-            largestBasis = null;
-            largestElem = null;
-            for (const setElem of resultArr) {
-                const thisBasis = func(setElem);
-                if (largestBasis == null || thisBasis > largestBasis) {
-                    largestBasis = thisBasis;
-                    largestElem = setElem;
-                }
-            }
-        }
-    }
-
-    resultArr.sort((a, b) => func(a) - func(b));
-
-    return resultArr;
-}
-
 export function calculateWeight(enjoyment, compatThreshold) {
     const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
     const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
@@ -91,7 +37,11 @@ export class EnjoymentProfile {
         this.compat = (!isOther) ? BASE_COMPAT : null;
         this.compatThreshold = (!isOther) ? 100.0 : null;
 
-        this.enjMap = new Map();
+        /**
+         * level ID's mapped to the user's rated enjoyment and the level's actual rating
+         * @type {Map<number, {enjoyment: number, actualRating: number}>}
+         */
+        this.ratingMap = new Map();
 
         this.leastFavoriteLevelIDs = [];
         this.favoriteLevelIDs = [];
@@ -114,25 +64,25 @@ export class EnjoymentProfile {
     }
 
     getEnjoyment(levelID) {
-        return this.enjMap.get(levelID);
+        return this.ratingMap.get(levelID).enjoyment;
     }
 
-    addEnjRating(levelID, enjoyment) {
+    addEnjRating(levelID, enjoyment, actualRating) {
         if (enjoyment < 0 || enjoyment > 10) {
             return null;
         }
 
-        this.enjMap.set(levelID, enjoyment);
+        this.ratingMap.set(levelID, {enjoyment: enjoyment, actualRating: actualRating});
 
         return [levelID, enjoyment];
     }
 
     clearEnjRatings() {
-        this.enjMap.clear();
+        this.ratingMap.clear();
     }
 
     isLevelCompleted(levelID) {
-        return this.enjMap.has(levelID);
+        return this.ratingMap.has(levelID);
     }
 
     calculateCompat() {
@@ -148,7 +98,8 @@ export class EnjoymentProfile {
         let totalCompat = 0;
         let numCommonLevels = 0;
 
-        for (const [levelID, enjoyment] of this.enjMap) {
+        for (const [levelID, ratingInfo] of this.ratingMap) {
+            const enjoyment = ratingInfo.enjoyment;
             const mainUserEnjoyment = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
 
             if (mainUserEnjoyment == null) {
@@ -224,11 +175,11 @@ class DataManager {
         this.levelWeightsMap = new Map();
     }
 
-    addMainUserEnjRating(levelID, enjoyment) {
-        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment);
+    addMainUserEnjRating(levelID, enjoyment, actualRating) {
+        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, actualRating);
     }
 
-    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment) {
+    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, actualRating) {
         if (otherUserID === this.mainUserEnjProfile.userID) {
             return null;
         }
@@ -237,7 +188,7 @@ class DataManager {
             this.otherUserEnjProfileMap.set(otherUserID, new EnjoymentProfile(otherUserID, otherUsername, true));
         }
 
-        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment);
+        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, actualRating);
     }
 
     calculateCompatsAndThresholds() {
@@ -256,7 +207,7 @@ class DataManager {
 
     getMostCompatiblePlayers(limit = 10, minRatings = 5) {
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
-            if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
+            if (a.calculateCompatThreshold() == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
 
@@ -266,7 +217,7 @@ class DataManager {
 
     getLeastCompatiblePlayers(limit = 10, minRatings = 5) {
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
-            if (a.calculateCompatThreshold() == null || a.enjMap.size < minRatings) {
+            if (a.calculateCompatThreshold() == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
 
@@ -289,11 +240,12 @@ class DataManager {
 
     addAllWeights() {
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
-            for (const [levelID, enjRating] of otherUserEnjProfile.enjMap) {
+            for (const [levelID, ratingInfo] of otherUserEnjProfile.ratingMap) {
                 if (this.mainUserEnjProfile.compatThreshold == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
                     continue;
                 }
 
+                const enjRating = ratingInfo.enjoyment;
                 const calculatedWeight = calculateWeight(enjRating, otherUserEnjProfile.compatThreshold);
                 this.addWeight(levelID, calculatedWeight);
             }
@@ -302,6 +254,35 @@ class DataManager {
 
     getMostRecommendedLevels(limit = 10) {
         return getNSmallest(this.levelWeightsMap.keys(), limit, (key) => -this.levelWeightsMap.get(key).weight)
+    }
+
+    useDebugData() {
+        dataManager.reset();
+
+        dataManager.mainUserEnjProfile.setUserID(92);
+        dataManager.mainUserEnjProfile.setUsername("diffieHellmanSpongebob93229"); 
+
+        dataManager.addMainUserEnjRating(1, 3, 3);
+        dataManager.addMainUserEnjRating(2, 3, 3);
+        dataManager.addMainUserEnjRating(3, 9, 5);
+
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, 3);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, 3);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, 5);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24);
+
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, 3);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, 3);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, 5);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, 30);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62869408, 7, 29);
     }
 }
 
