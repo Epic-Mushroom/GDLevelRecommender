@@ -1,5 +1,6 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
+import {getNSmallest} from "./utils.js";
 
 const GDDL_API_URL = "https://gdladder.com/api";
 const ALT_BASE_URL = "/api"; // for redirects
@@ -9,7 +10,7 @@ const RATE_LIMIT_DELAY_MS = 0;
 
 const DEBUG_USERNAME = "DEBUGDEBUG93229"; // entering this username will use debug data
 
-const SKILLS_MAPPING = new Map([
+export const SKILLS_MAPPING = new Map([
     ["Cube", "cu"],
     ["Ship", "sh"],
     ["Ball", "b"],
@@ -174,7 +175,7 @@ async function requestLevelSkills(levelID) {
 }
 
 // reformats the API response into something more usable
-export async function getLevelSkills(levelID) {
+export async function getLevelSkills(levelID, limit = null) {
     const tags = await requestLevelSkills(levelID);
     const skillsMap = new Map(); // each skill by id mapped to num of votes
 
@@ -183,7 +184,11 @@ export async function getLevelSkills(levelID) {
         skillsMap.set(skillName, tag.ReactCount);
     }
 
-    return skillsMap;
+    if (limit == null) {
+        return skillsMap;
+    } else {
+        return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+    }
 }
 
 /**

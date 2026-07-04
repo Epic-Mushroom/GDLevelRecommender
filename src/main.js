@@ -1,4 +1,5 @@
 import * as dataCollection from "./data-collection.js";
+import {reverseMap} from "./utils.js";
 
 const SERVER_TICK_DELAY = 50; // milliseconds
 
@@ -39,25 +40,31 @@ function errorMsg(message) {
 async function addLevelCard(levelID) {
     const levelCardFragment = levelCardTemplate.content.cloneNode(true);
     const levelCard = levelCardFragment.querySelector(".level-card");
+    const skillCard = levelCardFragment.querySelector(".skills-display");
     
+    dataCollection.getLevelSkills(levelID, 3).then(arr => {
+        const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
+        let skillsString = arr.map(elem => mapToSkillName.get(elem[0])).join(", ");
+
+        if (skillsString === "") {
+            skillsString += "No skills found";
+        }
+
+        skillCard.textContent = skillsString;
+    });
+
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
 }
 
 async function displayRecommendations(username, minTier, maxTier) {
-    try {
-        dataCollection.resetDataManager();
+    dataCollection.resetDataManager();
 
-        const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier);
+    const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier);
 
-        for (const levelID of levelRecs) {
-            await addLevelCard(levelID);
-            console.log(`creating card for level ID: ${levelID}`);
-        }
-
-    } catch (err) {
-        errorMsg(err.message);
-
+    for (const levelID of levelRecs) {
+        addLevelCard(levelID);
+        console.log(`creating card for level ID: ${levelID}`);
     }
 }
 
@@ -121,7 +128,7 @@ form.addEventListener("submit", async (event) => {
 
     } catch (err) {
         errorMsg(err.message);
-
+        throw err; // DEBUG ONLY
     }
 });
 

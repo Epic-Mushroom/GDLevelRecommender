@@ -205,6 +205,33 @@ p {
 
 }
 
+.tier-enjoyment-display {
+  position: absolute;
+  top: 0%;
+  right: 0%;
+
+  display: flex;
+  flex-direction: row;
+}
+
+.rating-value {
+  padding: 15px;
+}
+
+.skills-display {
+  position: absolute;
+  left: 0%;
+  bottom: 0%;
+
+  margin-left: 15px;
+  margin-bottom: 15px;
+
+  border-radius: 10px;
+  border: inherit;
+
+  padding: 5px 14px;
+}
+
 #error-message-text {
     display: none;
     color: red;
