@@ -22,10 +22,27 @@ const STEP_2_WEIGHT_CALC_N = 1.5;
 const STEP_2_WEIGHT_CALC_P = 1.2;
 const STEP_2_WEIGHT_CALC_B = -260;
 
-export function calculateWeight(enjoyment, compatThreshold) {
+/**
+ * 
+ * @param {number} enjoyment 
+ * @param {number} rating 
+ * @param {number} maxTier 
+ * @param {number} minTier 
+ * @param {number} compatThreshold 
+ * @returns 
+ */
+export function calculateWeight(enjoyment, rating, minTier, maxTier, compatThreshold) {
     const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
     const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
-    return step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * compatThreshold) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
+    let cumulativeResult = step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * compatThreshold) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
+
+    if (rating < minTier || rating > maxTier) {
+        cumulativeResult -= 99999;
+    }
+
+    // skill weighting here
+
+    return cumulativeResult;
 }
 
 export class EnjoymentProfile {
@@ -238,7 +255,7 @@ class DataManager {
         return weight;
     }
 
-    addAllWeights() {
+    addAllWeights(minTier = 1, maxTier = 39) {
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
             for (const [levelID, ratingInfo] of otherUserEnjProfile.ratingMap) {
                 if (this.mainUserEnjProfile.compatThreshold == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
@@ -246,14 +263,17 @@ class DataManager {
                 }
 
                 const enjRating = ratingInfo.enjoyment;
-                const calculatedWeight = calculateWeight(enjRating, otherUserEnjProfile.compatThreshold);
+                const actualRating = ratingInfo.actualRating;
+                const calculatedWeight = calculateWeight(enjRating, actualRating, minTier, maxTier, otherUserEnjProfile.compatThreshold);
                 this.addWeight(levelID, calculatedWeight);
             }
         }
     }
 
-    getMostRecommendedLevels(limit = 10) {
-        return getNSmallest(this.levelWeightsMap.keys(), limit, (key) => -this.levelWeightsMap.get(key).weight)
+    getMostRecommendedLevels(limit = 10, minTier, maxTier) {
+        return getNSmallest(this.levelWeightsMap.keys(), limit, (key) => {
+            return -this.levelWeightsMap.get(key).weight;
+        })
     }
 
     useDebugData() {
@@ -266,23 +286,23 @@ class DataManager {
         dataManager.addMainUserEnjRating(2, 3, 3);
         dataManager.addMainUserEnjRating(3, 9, 5);
 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, 3);
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, 3);
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, 5);
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28);
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21);
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5);
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24);
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, 3); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, 3); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, 5); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28); // Digital Descent
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21); // Azurite sillow
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5); // Lazurite
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24); // Azurite royen
 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, 3);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, 3);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, 5);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, 30);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62869408, 7, 29);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28); // Digital Descent
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21); // Azurite sillow
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24); // Heavens Door
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28); // Ethereal Artifice
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, 30); // Next Stage
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62869408, 7, 29); // Chromatic Haze
     }
 }
 

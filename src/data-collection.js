@@ -329,7 +329,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
         dataManager.useDebugData();
 
         dataManager.calculateCompatsAndThresholds();
-        dataManager.addAllWeights();
+        dataManager.addAllWeights(minTier, maxTier);
         return dataManager.getMostRecommendedLevels();
     }
 
@@ -380,7 +380,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 5: registering all level weights
     timestamp = Date.now();
-    dataManager.addAllWeights();
+    dataManager.addAllWeights(minTier, maxTier);
     console.log("added all weights");
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 5 TIME ELAPSED: ${timeElapsedPerStage[5]}ms`);

@@ -41,7 +41,10 @@ async function addLevelCard(levelID) {
     const levelCardFragment = levelCardTemplate.content.cloneNode(true);
     const levelCard = levelCardFragment.querySelector(".level-card");
     const skillCard = levelCardFragment.querySelector(".skills-display");
+    const levelIDText = levelCardFragment.querySelector(".level-id");
     
+    levelIDText.textContent = levelID;
+
     dataCollection.getLevelSkills(levelID, 3).then(arr => {
         const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
         let skillsString = arr.map(elem => mapToSkillName.get(elem[0])).join(", ");
