@@ -53,6 +53,8 @@ async function addLevelCard(levelID, levelInfo) {
     const levelCard = levelCardFragment.querySelector(".level-card");
     const skillCard = levelCardFragment.querySelector(".skills-display");
     const levelName = levelCardFragment.querySelector(".level-name");
+    const tier = levelCardFragment.querySelector(".tier");
+    const enj = levelCardFragment.querySelector(".enjoyment");
 
     dataCollection.getLevelSkills(levelID, 3).then(arr => {
         const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
@@ -66,6 +68,8 @@ async function addLevelCard(levelID, levelInfo) {
     });
 
     levelName.textContent = levelInfo.levelName;
+    tier.textContent = Math.round(levelInfo.actualRating);
+    enj.textContent = Math.round(levelInfo.actualEnj);
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
@@ -80,7 +84,7 @@ async function displayRecommendations(username, minTier, maxTier) {
     recommendationsContainer.style.setProperty("display", "flex");
 
     const h2 = document.createElement("h2");
-    h2.textContent = "Your recommended levels";
+    h2.textContent = (levelRecs.length > 0) ? "Your recommended levels" : "Wasn't able to get any recommendations :(";
     recommendationsContainer.append(h2);
     startAnimation(h2, "slide-right-and-fade-in");
     await sleep(LEVEL_CARD_DELAY);

@@ -6,6 +6,9 @@ const DEFAULT_USERNAME = "EpicMushroom";
 const BASE_COMPAT = 150;
 const ENJ_DIFFERENCE_FACTOR = 50;
 
+// up to [this value] users will be put into the database
+export const MAX_OTHER_USERS_TO_TRACK = 1999;
+
 // step 1 weight calc formula: B + enjoyment * M
 const STEP_1_WEIGHT_CALC_B = -500;
 const STEP_1_WEIGHT_CALC_M = 100;
@@ -45,6 +48,14 @@ export function calculateWeight(enjoyment, rating, minTier, maxTier, compatThres
     return cumulativeResult;
 }
 
+class DataError extends Error {
+    constructor(message) {
+        super(message);
+        
+        this.name = "DataError";
+    }
+}
+
 export class EnjoymentProfile {
     constructor(userID = DEFAULT_USER_ID, username = DEFAULT_USERNAME, isOther = false) {
         this.userID = userID;
@@ -56,9 +67,11 @@ export class EnjoymentProfile {
 
         /**
          * level ID's mapped to the user's rated enjoyment and the level's info
-         * @type {Map<number, {enjoyment: number, actualRating: number, actualEnj: actualEnj, levelName: levelName}>}
+         * @type {Map<number, {enjoyment: number, actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
          */
         this.ratingMap = new Map();
+
+        this.numCommonLevels = 0;
 
         this.leastFavoriteLevelIDs = [];
         this.favoriteLevelIDs = [];
@@ -84,12 +97,16 @@ export class EnjoymentProfile {
         return this.ratingMap.get(levelID)?.enjoyment;
     }
 
-    addEnjRating(levelID, enjoyment, actualRating, actualEnj = -1, levelName = "Level") {
+    addEnjRating(levelID, enjoyment, actualRating, actualEnj = -1, levelName = "Level", levelAuthor = "-") {
         if (enjoyment < 0 || enjoyment > 10) {
             return null;
         }
 
-        this.ratingMap.set(levelID, {enjoyment: enjoyment, actualRating: actualRating, actualEnj: actualEnj, levelName: levelName});
+        this.ratingMap.set(levelID, {enjoyment: enjoyment, actualRating: actualRating, actualEnj: actualEnj, levelName: levelName, levelAuthor: levelAuthor});
+
+        if (!this.isOther || dataManager.mainUserEnjProfile.getEnjoyment(levelID) != null) {
+            this.numCommonLevels++;
+        }
 
         return [levelID, enjoyment];
     }
@@ -202,6 +219,10 @@ class DataManager {
         }
 
         if (!this.otherUserEnjProfileMap.has(otherUserID)) {
+            if (this.otherUserEnjProfileMap.size >= MAX_OTHER_USERS_TO_TRACK) {
+                throw new DataError("other user enj profile map is full");
+            }
+
             this.otherUserEnjProfileMap.set(otherUserID, new EnjoymentProfile(otherUserID, otherUsername, true));
         }
 
@@ -222,23 +243,33 @@ class DataManager {
         }
     }
 
-    getMostCompatiblePlayers(limit = 10, minRatings = 5) {
+    /**
+     * returns the players with the most number of levels completed in common, not to be confused with highest compatibility
+     * @param {number} limit 
+     */
+    getMostCommonPlayers(limit) {
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
-            if (a.calculateCompatThreshold() == null || a.ratingMap.size < minRatings) {
-                return Infinity;
-            }
-
-            return -1 * a.calculateCompatThreshold();
+            return -1 * a.numCommonLevels;
         });
     }
 
-    getLeastCompatiblePlayers(limit = 10, minRatings = 5) {
+    getMostCompatiblePlayers(limit = 10, minRatings = 1) {
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
-            if (a.calculateCompatThreshold() == null || a.ratingMap.size < minRatings) {
+            if (a.compatThreshold == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
 
-            return a.calculateCompatThreshold();
+            return -1 * a.compatThreshold;
+        });
+    }
+
+    getLeastCompatiblePlayers(limit = 10, minRatings = 1) {
+        return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
+            if (a.compatThreshold == null || a.ratingMap.size < minRatings) {
+                return Infinity;
+            }
+
+            return a.compatThreshold;
         });
     }
 
@@ -307,3 +338,4 @@ class DataManager {
 }
 
 export const dataManager = new DataManager();
+window.dataManager = dataManager;
