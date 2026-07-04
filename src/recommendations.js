@@ -29,7 +29,7 @@ export function calculateWeight(enjoyment, compatThreshold) {
 }
 
 export class EnjoymentProfile {
-    constructor(userID = 92, username = DEFAULT_USERNAME, isOther = false) {
+    constructor(userID = DEFAULT_USER_ID, username = DEFAULT_USERNAME, isOther = false) {
         this.userID = userID;
         this.username = username;
         this.isOther = isOther;
@@ -64,7 +64,7 @@ export class EnjoymentProfile {
     }
 
     getEnjoyment(levelID) {
-        return this.ratingMap.get(levelID).enjoyment;
+        return this.ratingMap.get(levelID)?.enjoyment;
     }
 
     addEnjRating(levelID, enjoyment, actualRating) {

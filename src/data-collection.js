@@ -1,5 +1,5 @@
 import * as recs from "./recommendations.js";
-import {dataManager, getRandomInt} from "./recommendations.js"
+import {dataManager} from "./recommendations.js"
 
 const GDDL_API_URL = "https://gdladder.com/api";
 const ALT_BASE_URL = "/api"; // for redirects

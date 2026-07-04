@@ -53,3 +53,7 @@ export function getNSmallest(iterable, n, func = (a) => a) {
 
     return resultArr;
 }
+
+export function reverseMap(map) {
+    return new Map(Array.from(map, ([key, val]) => [val, key]));
+}
