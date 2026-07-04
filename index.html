@@ -10,7 +10,7 @@
     <body>
         <template id="level-card-template">
             <div class="level-card vertical-flex glass">
-                <h3>Loading Level ID: <span class="level-id">?</span></h3>
+                <h3 class="level-name">Loading Level ID: <span class="level-id">?</span></h3>
                 <div class="tier-enjoyment-display">
                     <div class="rating-value">T<span class="tier">?</span></div>
                     <div class="rating-value">E<span class="enjoyment">?</span></div>
@@ -23,12 +23,14 @@
 
         <div id="app" class="vertical-flex">
             <form id="form" class="glass">
-                <div class="min-tier"><label for="min-tier-field">Minimum Tier</label>
-                <input type="text" id="min-tier-field" name="min-tier" class="small-text-field"></div>
-                <div class="max-tier"><label for="max-tier-field">Maximum Tier</label>
-                <input type="text" id="max-tier-field" name="max-tier" class="small-text-field"></div>
-                <div class="username"><label for="username-field">GDDL Username</label>
-                <input type="text" id="username-field" name="username" class="medium-text-field"></div>
+                <div class="tier-range horizontal-flex">
+                    <label for="min-tier-field">Tier Range:</label>
+                    <input type="text" id="min-tier-field" name="min-tier" class="text-field small-text-field">
+                    <label for="max-tier-field">to</label>
+                    <input type="text" id="max-tier-field" name="max-tier" class="text-field small-text-field">
+                </div>
+                <div class="username"><label for="username-field">GDDL Username:</label>
+                <input type="text" id="username-field" name="username" class="text-field large-text-field"></div>
                 
                 <button type="submit" id="submit-button" class="blending-shadow glass">Go</button>
             </form>

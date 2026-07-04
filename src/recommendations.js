@@ -55,8 +55,8 @@ export class EnjoymentProfile {
         this.compatThreshold = (!isOther) ? 100.0 : null;
 
         /**
-         * level ID's mapped to the user's rated enjoyment and the level's actual rating
-         * @type {Map<number, {enjoyment: number, actualRating: number}>}
+         * level ID's mapped to the user's rated enjoyment and the level's info
+         * @type {Map<number, {enjoyment: number, actualRating: number, actualEnj: actualEnj, levelName: levelName}>}
          */
         this.ratingMap = new Map();
 
@@ -84,12 +84,12 @@ export class EnjoymentProfile {
         return this.ratingMap.get(levelID)?.enjoyment;
     }
 
-    addEnjRating(levelID, enjoyment, actualRating) {
+    addEnjRating(levelID, enjoyment, actualRating, actualEnj = -1, levelName = "Level") {
         if (enjoyment < 0 || enjoyment > 10) {
             return null;
         }
 
-        this.ratingMap.set(levelID, {enjoyment: enjoyment, actualRating: actualRating});
+        this.ratingMap.set(levelID, {enjoyment: enjoyment, actualRating: actualRating, actualEnj: actualEnj, levelName: levelName});
 
         return [levelID, enjoyment];
     }
@@ -185,18 +185,18 @@ class DataManager {
         // just contains the compatibility values of all collected players, used to calculate compat threshold
         this.compatArr = [];
         /**
-         * level ID's of possible recommendations mapped to their calculated weight and number of enj ratings
-         * used in the calculation of the weight
-         * @type {Map<number, {weight: number, numRatings: number}>}
+         * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
+         * used in the calculation of the weight, and level info
+         * @type {Map<number, {weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string}}>}
          */
         this.levelWeightsMap = new Map();
     }
 
-    addMainUserEnjRating(levelID, enjoyment, actualRating) {
-        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, actualRating);
+    addMainUserEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName) {
+        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName);
     }
 
-    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, actualRating) {
+    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, actualRating, actualEnj, levelName) {
         if (otherUserID === this.mainUserEnjProfile.userID) {
             return null;
         }
@@ -205,7 +205,7 @@ class DataManager {
             this.otherUserEnjProfileMap.set(otherUserID, new EnjoymentProfile(otherUserID, otherUsername, true));
         }
 
-        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, actualRating);
+        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName);
     }
 
     calculateCompatsAndThresholds() {
@@ -242,13 +242,13 @@ class DataManager {
         });
     }
 
-    addWeight(levelID, weight) {
+    addWeight(levelID, weight, levelInfo) {
         if (this.levelWeightsMap.get(levelID) == null) {
-            this.levelWeightsMap.set(levelID, {weight: weight, numRatings: 1});
+            this.levelWeightsMap.set(levelID, {weight: weight, numRatings: 1, levelInfo: levelInfo});
 
         } else {
             const newWeight = (this.levelWeightsMap.get(levelID).weight * this.levelWeightsMap.get(levelID).numRatings + weight) * (1.0 / (this.levelWeightsMap.get(levelID).numRatings + 1));
-            this.levelWeightsMap.set(levelID, {weight: newWeight, numRatings: this.levelWeightsMap.get(levelID).numRatings + 1})
+            this.levelWeightsMap.set(levelID, {weight: newWeight, numRatings: this.levelWeightsMap.get(levelID).numRatings + 1, levelInfo: levelInfo})
 
         }
 
@@ -265,13 +265,13 @@ class DataManager {
                 const enjRating = ratingInfo.enjoyment;
                 const actualRating = ratingInfo.actualRating;
                 const calculatedWeight = calculateWeight(enjRating, actualRating, minTier, maxTier, otherUserEnjProfile.compatThreshold);
-                this.addWeight(levelID, calculatedWeight);
+                this.addWeight(levelID, calculatedWeight, {actualRating: actualRating, actualEnj: ratingInfo.actualEnj, levelName: ratingInfo.levelName});
             }
         }
     }
 
     getMostRecommendedLevels(limit = 10, minTier, maxTier) {
-        return getNSmallest(this.levelWeightsMap.keys(), limit, (key) => {
+        return getNSmallest(this.levelWeightsMap, limit, ([key, val]) => {
             return -this.levelWeightsMap.get(key).weight;
         })
     }
@@ -289,7 +289,7 @@ class DataManager {
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, 3); 
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, 3); 
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, 5); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28); // Digital Descent
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28, 6, "Digital Descent"); // Digital Descent
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21); // Azurite sillow
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5); // Lazurite
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24); // Azurite royen
@@ -297,7 +297,7 @@ class DataManager {
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, 3);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, 3);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, 5);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28); // Digital Descent
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28, 6, "Digital Descent"); // Digital Descent
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21); // Azurite sillow
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24); // Heavens Door
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28); // Ethereal Artifice

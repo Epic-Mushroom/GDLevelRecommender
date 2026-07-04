@@ -1,5 +1,5 @@
 import * as dataCollection from "./data-collection.js";
-import {reverseMap} from "./utils.js";
+import {purifyInt, reverseMap} from "./utils.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -48,13 +48,11 @@ function errorMsg(message) {
     startAnimation(errorMessageText, "display-and-fade-out", true);
 }
 
-async function addLevelCard(levelID) {
+async function addLevelCard(levelID, levelInfo) {
     const levelCardFragment = levelCardTemplate.content.cloneNode(true);
     const levelCard = levelCardFragment.querySelector(".level-card");
     const skillCard = levelCardFragment.querySelector(".skills-display");
-    const levelIDText = levelCardFragment.querySelector(".level-id");
-    
-    levelIDText.textContent = levelID;
+    const levelName = levelCardFragment.querySelector(".level-name");
 
     dataCollection.getLevelSkills(levelID, 3).then(arr => {
         const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
@@ -66,6 +64,8 @@ async function addLevelCard(levelID) {
 
         skillCard.textContent = skillsString;
     });
+
+    levelName.textContent = levelInfo.levelName;
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
@@ -85,24 +85,11 @@ async function displayRecommendations(username, minTier, maxTier) {
     startAnimation(h2, "slide-right-and-fade-in");
     await sleep(LEVEL_CARD_DELAY);
 
-    for (const levelID of levelRecs) {
-        addLevelCard(levelID);
+    for (const [levelID, levelWeightInfo] of levelRecs) {
+        addLevelCard(levelID, levelWeightInfo.levelInfo);
         console.log(`creating card for level ID: ${levelID}`);
         await sleep(LEVEL_CARD_DELAY);
     }
-}
-
-/**
- * 
- * @param {string} string 
- * @param {number} min 
- * @param {number} max 
- * @returns 
- */
-function purifyInt(string, min = -Infinity, max = Infinity) {
-    let float = parseFloat(string);
-    float = Math.max(Math.min(float, max), min);
-    return (isNaN(float) ? min : Math.round(float));
 }
 
 /**
@@ -124,8 +111,8 @@ function purifyFormData(formData) {
 
     }
 
-    purifiedData.minTier = purifyInt(formData.get("min-tier"), dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
-    purifiedData.maxTier = purifyInt(formData.get("max-tier"), dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
+    purifiedData.minTier = purifyInt(formData.get("min-tier"), dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
+    purifiedData.maxTier = purifyInt(formData.get("max-tier"), dataCollection.DEFAULT_MAX_TIER, dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
 
     return purifiedData;
 }

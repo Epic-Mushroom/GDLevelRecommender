@@ -1,3 +1,17 @@
+/**
+ * 
+ * @param {string} string 
+ * @param {number} defaultValue
+ * @param {number} min 
+ * @param {number} max 
+ * @returns 
+ */
+export function purifyInt(string, defaultValue = 0, min = -Infinity, max = Infinity) {
+    let float = parseFloat(string);
+    float = Math.max(Math.min(float, max), min);
+    return (isNaN(float) ? defaultValue : Math.round(float));
+}
+
 export function getRandomInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max) + 1;
@@ -5,9 +19,11 @@ export function getRandomInt(min, max) {
 }
 
 /**
- * 
- * @param {iterable} iterable 
- * @param {Function} func a function that is called on each element to use the result as the basis for sorting
+ * @template T
+ * @param {Iterable<T>} iterable 
+ * @param {number} n
+ * @param {function(T): number} func a function that is called on each element to use the result as the basis for sorting
+ * @returns {T[]}
  */
 export function getNSmallest(iterable, n, func = (a) => a) {
     const resultArr = [];

@@ -225,10 +225,16 @@ async function registerUserSubmissions(userID, username = null, isOther = false,
 
         for (const submission of response.submissions) {
             if (isOther) {
-                dataManager.addOtherUserEnjRating(userID, username, submission.Level.ID, submission.Enjoyment, submission.Level.Rating);
+                dataManager.addOtherUserEnjRating(
+                    userID, username, submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
+                    submission.Level.Enjoyment, submission.Level.Meta.Name
+                );
 
             } else {
-                dataManager.addMainUserEnjRating(submission.Level.ID, submission.Enjoyment, submission.Level.Rating);
+                dataManager.addMainUserEnjRating(
+                    submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
+                    submission.Level.Enjoyment, submission.Level.Meta.Name
+                );
 
             }
 

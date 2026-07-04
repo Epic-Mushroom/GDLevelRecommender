@@ -198,10 +198,11 @@ p {
 
 .horizontal-flex {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 10px;
 
   align-items: center;
+  justify-content: center;
 }
 
 .vertical-flex {
@@ -225,7 +226,7 @@ p {
 }
 
 #form {
-  width: 640px;
+  width: 500px;
   max-width: 80vw;
   height: 150px;
   min-height: min-content;
@@ -244,7 +245,7 @@ p {
   gap: 10px;
 
   border-radius: 10px;
-  border: 3px solid rgba(0, 0, 0, 0.25);
+  border: 3px solid rgba(0, 0, 0, 0.616);
 
   padding: 15px 25px 65px 25px;
 }
@@ -271,6 +272,31 @@ p {
   text-decoration: underline;
   color: #42ffe6;
   background-color: #5a6e7441;
+}
+
+.text-field {
+  height: 30px;
+}
+
+.small-text-field {
+  width: 50px;
+
+  font-size: large;
+  text-align: center;
+}
+
+.medium-text-field {
+  width: 95px;
+
+  font-size: large;
+  text-align: center;
+}
+
+.large-text-field {
+  width: 167px;
+
+  font-size: large;
+  text-align: center;
 }
 
 #recommendations-container {
