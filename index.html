@@ -9,28 +9,28 @@
     </head>
     <body>
         <template id="level-card-template">
-            <div class="level-card vertical-flex">
+            <div class="level-card vertical-flex glass">
                 <h3>Loading Level ID: <span class="level-id">?</span></h3>
                 <div class="tier-enjoyment-display">
                     <div class="rating-value">T<span class="tier">?</span></div>
                     <div class="rating-value">E<span class="enjoyment">?</span></div>
                 </div>
-                <div class="skills-display">
+                <div class="skills-display glass">
                     Loading skills...
                 </div>
             </div>
         </template>
 
-        <div id="app">
-            <form id="form">
-                <div><label for="min-tier-field">Minimum Tier</label>
+        <div id="app" class="vertical-flex">
+            <form id="form" class="glass">
+                <div class="min-tier"><label for="min-tier-field">Minimum Tier</label>
                 <input type="text" id="min-tier-field" name="min-tier" class="small-text-field"></div>
-                <div><label for="max-tier-field">Maximum Tier</label>
+                <div class="max-tier"><label for="max-tier-field">Maximum Tier</label>
                 <input type="text" id="max-tier-field" name="max-tier" class="small-text-field"></div>
-                <div><label for="username-field">GDDL Username</label>
+                <div class="username"><label for="username-field">GDDL Username</label>
                 <input type="text" id="username-field" name="username" class="medium-text-field"></div>
                 
-                <button type="submit" id="submit-button">Retrieve Ratings</button>
+                <button type="submit" id="submit-button" class="blending-shadow glass">Go</button>
             </form>
 
             <div id="error-container">
@@ -38,7 +38,6 @@
             </div>
 
             <div id="recommendations-container" class="blending-shadow vertical-flex">
-                <h2>Your recommended levels</h2>
             </div>
         </div>
         

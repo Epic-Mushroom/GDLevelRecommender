@@ -1,5 +1,21 @@
+@property --gradient-start-color {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #7bdaaa;
+}
+
+@property --gradient-end-color {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #4aa9c4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 :root {
-  --text: #6b6375;
+  --text: #211d27;
   --text-h: #08060d;
   --bg: #fff;
   --border: #e5e4e7;
@@ -28,6 +44,8 @@
   @media (max-width: 1024px) {
     font-size: 16px;
   }
+
+  --gradient-midpoint: 50%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -84,7 +102,7 @@ p {
 }
 
 #app {
-  width: 1126px;
+  width: 1920px;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
@@ -94,6 +112,9 @@ p {
   flex-direction: column;
   gap: 15px;
   box-sizing: border-box;
+
+  padding: 20px 0px;
+  background: linear-gradient(to right, var(--gradient-start-color), var(--gradient-end-color) var(--gradient-midpoint));
 }
 
 #spacer {
@@ -191,8 +212,69 @@ p {
   align-items: center;
 }
 
+.glass {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .blending-shadow {
-  text-shadow: 3px 3px 3px rgba(0, 0, 0, 0.25);
+  text-shadow: 3px 3px 9px rgba(0, 0, 0, 0.15);
+}
+
+#form {
+  width: 640px;
+  max-width: 80vw;
+  height: 150px;
+  min-height: min-content;
+
+  /* display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  place-items: center;
+  grid-template-areas: 
+    "min-tier max-tier"
+    "username username"
+    "submit submit";
+  align-content: space-around; */
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  border-radius: 10px;
+  border: 3px solid rgba(0, 0, 0, 0.25);
+
+  padding: 15px 25px 65px 25px;
+}
+
+#submit-button {
+  position: absolute;
+  left: 0%;
+  bottom: 0%;
+  right: 0%;
+  margin: 0 auto;
+
+  height: 50px;
+
+  color: #fbf5ff;
+  background-color: #6b6b6b2f;
+
+  font-size: large;
+  font-weight: bolder;
+
+  border-radius: 0px 0px 10px 10px;
+}
+
+#submit-button:hover {
+  text-decoration: underline;
+  color: #42ffe6;
+  background-color: #5a6e7441;
+}
+
+#recommendations-container {
+  display: none;
 }
 
 .level-card {

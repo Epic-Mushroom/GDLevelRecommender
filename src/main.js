@@ -1,7 +1,14 @@
 import * as dataCollection from "./data-collection.js";
 import {reverseMap} from "./utils.js";
 
-const SERVER_TICK_DELAY = 50; // milliseconds
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const CLIENT_TICK_DELAY = 50; // milliseconds
+
+const MAX_GRADIENT_DISTANCE = 80; // percent
+const MIN_GRADIENT_DISTANCE = 20; // percent
+
+const LEVEL_CARD_DELAY = 500; // milliseconds
 
 function tick(numTicks) {
     let newTicks = numTicks + 1;
@@ -9,8 +16,12 @@ function tick(numTicks) {
     // restarts the timer
     setTimeout(() => {
         tick(newTicks);
-    }, SERVER_TICK_DELAY);
+    }, CLIENT_TICK_DELAY);
 }
+
+export let targetGradientX = 50; // percent
+
+const root = document.documentElement;
 
 /**
  * 
@@ -62,12 +73,22 @@ async function addLevelCard(levelID) {
 
 async function displayRecommendations(username, minTier, maxTier) {
     dataCollection.resetDataManager();
+    recommendationsContainer.style.setProperty("display", "none");
+    recommendationsContainer.replaceChildren();
 
     const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier);
+    recommendationsContainer.style.setProperty("display", "flex");
+
+    const h2 = document.createElement("h2");
+    h2.textContent = "Your recommended levels";
+    recommendationsContainer.append(h2);
+    startAnimation(h2, "slide-right-and-fade-in");
+    await sleep(LEVEL_CARD_DELAY);
 
     for (const levelID of levelRecs) {
         addLevelCard(levelID);
         console.log(`creating card for level ID: ${levelID}`);
+        await sleep(LEVEL_CARD_DELAY);
     }
 }
 
@@ -135,4 +156,23 @@ form.addEventListener("submit", async (event) => {
     }
 });
 
+// other listeners
+// sets the gradient midpoint to mouse cursor location
+export let gradientOnMouseMove = window.addEventListener("mousemove", (event) => {
+    let xPercent = (event.clientX / window.innerWidth) * 100;
+    // let yPercent = (event.clientY / window.innerHeight) * 100;
+
+    targetGradientX = Math.max(Math.min(xPercent, MAX_GRADIENT_DISTANCE), MIN_GRADIENT_DISTANCE)
+})
+
+export let gradientLerp = setInterval(() => {
+    const currentGradientX = parseFloat(window.getComputedStyle(root).getPropertyValue("--gradient-midpoint").replace("%", ""));
+
+    root.style.setProperty("--gradient-midpoint", `${
+        currentGradientX + 0.02 * (targetGradientX - currentGradientX)
+    }%`);
+    // console.log(`moving gradient from ${window.getComputedStyle(root).getPropertyValue("--gradient-midpoint")} (${currentGradientX}) to ${targetGradientX}`);
+}, 0.33 * CLIENT_TICK_DELAY);
+
+// start ticking    
 tick(0);
