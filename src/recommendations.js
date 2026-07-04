@@ -301,7 +301,7 @@ class DataManager {
     }
 
     getMostRecommendedLevels(limit = 10) {
-
+        return getNSmallest(this.levelWeightsMap.keys(), limit, (key) => -this.levelWeightsMap.get(key).weight)
     }
 }
 

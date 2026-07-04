@@ -1,341 +1,49 @@
-import * as recs from "./recommendations.js";
-import {dataManager, getRandomInt} from "./recommendations.js"
+import * as dataCollection from "./data-collection.js";
 
-const GDDL_API_URL = "https://gdladder.com/api";
-const ALT_BASE_URL = "/api"; // for redirects
-const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
+const SERVER_TICK_DELAY = 50; // milliseconds
 
-const RATE_LIMIT_DELAY_MS = 0;
+function tick(numTicks) {
+    let newTicks = numTicks + 1;
 
-const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
-const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
-
-const DEFAULT_MIN_TIER = 1;
-const DEFAULT_MAX_TIER = 39;
-
-// at max how many of the main user's rated levels per enjoyment rating are sent an api request
-// for example if the user has 140 levels rated an 8/10 only [this value] levels will be sent a request
-// this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
-const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
-// at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
-// a globillion requests total and we don't want that 
-const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 120; 
-// for sorting when gathering submissions from level page
-const DEFAULT_SUBMISSIONS_SORT = "dateAdded";
-const DEFAULT_SUBMISSIONS_SORT_DIRECTION = "asc";
-// up to [this value] users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 12;
-// up to [this value] levels from other users will be tracked
-const MAX_OTHER_USER_SUBMISSIONS = 50;
-// for sorting when gathering submissions from other users' pages
-const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "recency";
-const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
-
-const trackers = {
-    numAPICalls: 0,
-    numAPISuccesses: 0,
-    numAPIErrors: 0
+    // restarts the timer
+    setTimeout(() => {
+        tick(newTicks);
+    }, SERVER_TICK_DELAY);
 }
 
-const flags = {
-
-};
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-class APIError extends Error {
-    /**
-     * 
-     * @param {number} status 
-     * @param {string} message 
-     */
-    constructor(status, message) {
-        super(message);
-
-        this.name = "APIError";
-        this.status = status;
+/**
+ * 
+ * @param {HTMLElement} element 
+ * @param {string} className 
+ * @param {boolean}} hideOnceFinished 
+ */
+function startAnimation(element, className, hideOnceFinished = false) {
+    if (hideOnceFinished) {
+        element.style.setProperty("display", "block");
+        element.addEventListener("animationend", () => element.style.setProperty("display", "none"), {once: true});
     }
+
+    element.classList.toggle(className, false);
+    requestAnimationFrame(() => element.classList.toggle(className, true));
 }
 
 /**
  * 
  * @param {string} message 
  */
-function errorMsg(errorMessageText, message) {
+function errorMsg(message) {
     errorMessageText.textContent = message;
+    startAnimation(errorMessageText, "display-and-fade-out", true);
 }
 
-/**
- * 
- * @param {Array<string>} pathVariables 
- * @param {Object} queryParams 
- */
-async function getAPIResponse(pathVariables, queryParams, retried = false) {
-    let resultURL = ALT_BASE_URL;
-
-    for (const variable of pathVariables) {
-        resultURL += `/${encodeURIComponent(variable)}`;
-    }
-
-    const query = new URLSearchParams(queryParams).toString();
-    if (query.length > 0) {
-        resultURL += `?${query}`;
-    }
-
-    const response = await fetch(resultURL);
-    trackers.numAPICalls++;
-
-    if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        trackers.numAPIErrors++;
-
-        // if (response.status === 429 && !retried) {
-        //     console.log("rate limited... waiting 0 seconds");
-        //     await sleep(RATE_LIMIT_DELAY_MS);
-        //     return await getAPIResponse(pathVariables, queryParams, true);
-        // }
-
-        if (contentType && contentType.includes("application/json")) {
-            throw new APIError(response.status, `${response.status}: ${(await response.json()).message}`);
-
-        } else {
-            throw new APIError(response.status, `${response.status}: ${await response.text()}`);
-
-        }
-    }
-
-    trackers.numAPISuccesses++;
-    return await response.json();
-}
-
-/**
- * 
- * @param {string} username 
- */
-async function getUserID(username) {
-    const response = await getAPIResponse(["user", "search"], {limit: 1, name: username});
-
-    if (response.length === 0) {
-        return null;
-
-    } else {
-        return response[0].ID;
-    }
-}
-
-/**
- * 
- * @param {string} username 
- */
-async function getUserProfile(userID) {
-    const response = await getAPIResponse(["user", userID], {});
-
-    return response;
-}
-
-async function getLevelSubmissions(levelID, pageNum) {
-    const response = await getAPIResponse(["level", levelID, "submissions"], {
-        sort: DEFAULT_SUBMISSIONS_SORT,
-        sortDirection: DEFAULT_SUBMISSIONS_SORT_DIRECTION,
-        twoPlayer: false,
-        progressFilter: "victors",
-        limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
-        page: pageNum
-    });
-
-    return response;
-}
-
-/**
- * 
- * @param {string} username 
- */
-async function registerUserSubmissions(userID, username = null, isOther = false, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = "levelRating") {
-    if (username == null) {
-        const userProfile = await getUserProfile(userID);  
-        username = userProfile.Name;
-    }
-
-    console.log(`attempting to register submissions for ${username}`);
-
-    let numSubmissionsRegistered = 0;
-
-    for (let pageNum = 0; pageNum < 999; pageNum++) {
-        let limitReached = false;
-
-        const response = await getAPIResponse(["user", userID, "submissions"], {
-            minTier: minTier,
-            maxTier: maxTier,
-            limit: NUM_SUBMISSIONS_PER_USER_PAGE,
-            page: pageNum,
-            sort: sortMethod,
-            sortDirection: "desc",
-            onlyIncomplete: false,
-            pending: false
-        });
-
-        if (response.submissions == null || response.submissions.length === 0) {
-            break;
-        }
-
-        for (const submission of response.submissions) {
-            if (isOther) {
-                dataManager.addOtherUserEnjRating(userID, username, submission.Level.ID, submission.Enjoyment);
-
-            } else {
-                dataManager.addMainUserEnjRating(submission.Level.ID, submission.Enjoyment);
-
-            }
-
-            numSubmissionsRegistered++;
-            if (numSubmissionsRegistered >= limit) {
-                limitReached = true;
-                break;
-            }
-        }
-
-        if (limitReached) {
-            break;
-        }
-
-        // console.log(`${numSubmissionsRegistered} submissions registered so far`);
-    }
-
-    console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
-}
-
-async function registerAllOtherUserCommonSubmissions() {
-    let numTotalSubmissionsRegistered = 0;
-    // index = enjoyment
-    const levelsPerEnjoyment = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    
-    const promiseArr = [];
-
-    console.log("attempting to register all other users' common submissions");
-
-    for (const levelID of dataManager.mainUserEnjProfile.enjMap.keys()) {
-        let numSubmissionsThisLevelRegistered = 0;
-
-        try {
-            const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
-
-            if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-                // console.log(`skipping getting other user submissions from level ID ${levelID}`);
-                // if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-                //     console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
-                // }
-                continue;
-            }
-
-            for (let pageNum = 0; pageNum < Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE); pageNum++) {
-                const response = await getLevelSubmissions(levelID, pageNum);
-
-                for (const submission of response.submissions) {
-                    if (submission.Enjoyment == null) {
-                        continue;
-                    }
-
-                    dataManager.addOtherUserEnjRating(submission.UserID, submission.User.Name, levelID, submission.Enjoyment);
-                    numSubmissionsThisLevelRegistered++;
-                    numTotalSubmissionsRegistered++;
-                }
-            }
-
-            levelsPerEnjoyment[mainUserEnjRating]++;
-
-        } catch (err) {
-            if (err.name != "APIError") {
-                throw err;
-            }
-
-            if (err.status === 429) {
-                // console.log(`halting gathering submissions from level ID ${levelID} due to rate limit`)
-            }
-
-        }
-
-        // console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
-    }
-
-    await Promise.allSettled(promiseArr);
-    console.log(`registered ${numTotalSubmissionsRegistered} submissions from all other users`);
-}
-
-async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, usersLimit = MAX_OTHER_USERS_TO_COLLECT_FROM, submissionsLimit = MAX_OTHER_USER_SUBMISSIONS, sortMethod = DEFAULT_OTHER_USER_SUBMISSIONS_SORT) {
-    const otherUsersArr = [];
-    otherUsersArr.push(...dataManager.getLeastCompatiblePlayers(usersLimit / 2));
-    otherUsersArr.push(...dataManager.getMostCompatiblePlayers(usersLimit - usersLimit / 2));
-    
-    const promiseArr = [];
-
-    for (const otherUserEnjProfile of otherUsersArr) {
-        console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
-        promiseArr.push(registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier, maxTier, submissionsLimit, sortMethod));
-    }
-
-    await Promise.allSettled(promiseArr);
-}
-
-async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
+async function displayRecommendations(username) {
     try {
-        let timestamp = Date.now();
-        // index is the stage
-        const timeElapsedPerStage = [];
+        dataCollection.resetDataManager();
 
-        // stage 0: collect initial data
-        timestamp = Date.now();
-        const userID = await getUserID(username);
-
-        if (userID == null) {
-            throw new Error("User not found!");
-        }
-
-        const userProfile = await getUserProfile(userID);
-        if (userProfile.Name != username) {
-            console.warn("found user's name does not match input's username");
-            // might want to display this to the user
-        }
-
-        dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, userProfile.Name, false);
-        console.log(`set ${userProfile.Name}'s enj profile as the main enj profile`);
-        timeElapsedPerStage.push(Date.now() - timestamp);
-        console.log(`STAGE 0 TIME ELAPSED: ${timeElapsedPerStage[0]}ms`);
-
-        // stage 1: registering user submissions
-        timestamp = Date.now();
-        await registerUserSubmissions(userID, userProfile.name, false, minTier, maxTier);
-        timeElapsedPerStage.push(Date.now() - timestamp);
-        console.log(`STAGE 1 TIME ELAPSED: ${timeElapsedPerStage[1]}ms`);
-
-        // stage 2: registering all other users' submissions in common
-        timestamp = Date.now();
-        await registerAllOtherUserCommonSubmissions();
-        timeElapsedPerStage.push(Date.now() - timestamp);
-        console.log(`STAGE 2 TIME ELAPSED: ${timeElapsedPerStage[2]}ms`);
-
-        // stage 3: calculating compats
-        timestamp = Date.now();
-        dataManager.calculateCompatsAndThresholds();
-        console.log("calculated compatibilities and thresholds");
-        timeElapsedPerStage.push(Date.now() - timestamp);
-        console.log(`STAGE 3 TIME ELAPSED: ${timeElapsedPerStage[3]}ms`);
-
-        // stage 4: registering the submissions of the collected users
-        timestamp = Date.now();
-        await registerAllOtherUserSubmissions(minTier, maxTier);
-        console.log("registered all other user submissions");
-        timeElapsedPerStage.push(Date.now() - timestamp);
-        console.log(`STAGE 4 TIME ELAPSED: ${timeElapsedPerStage[4]}ms`);
-
-        // stage 5: registering all level weights
-        timestamp = Date.now();
-        dataManager.addAllWeights();
-        console.log("added all weights");
-        timeElapsedPerStage.push(Date.now() - timestamp);
-        console.log(`STAGE 5 TIME ELAPSED: ${timeElapsedPerStage[5]}ms`);
+        const levelRecs = await dataCollection.getRecommendations(username);
 
     } catch (err) {
-        errorMsg(errorMessageText, err.message);
+        errorMsg(err.message);
 
     }
 }
@@ -354,11 +62,11 @@ form.addEventListener("submit", async (event) => {
     const formData = new FormData(form);
 
     if (formData.get("username") === "") {
-        errorMsg(errorMessageText, "Username can't be blank");
+        errorMsg("Username can't be blank!");
         return;
     }
 
-    dataManager.reset();
-
-    await getRecommendations(formData.get("username"));
+    await displayRecommendations(formData.get("username"));
 });
+
+tick(0);
