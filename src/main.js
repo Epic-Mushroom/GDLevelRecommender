@@ -36,11 +36,24 @@ function errorMsg(message) {
     startAnimation(errorMessageText, "display-and-fade-out", true);
 }
 
-async function displayRecommendations(username) {
+async function addLevelCard(levelID) {
+    const levelCardFragment = levelCardTemplate.content.cloneNode(true);
+    const levelCard = levelCardFragment.querySelector(".level-card");
+    
+    recommendationsContainer.append(levelCardFragment);
+    startAnimation(levelCard, "slide-right-and-fade-in");
+}
+
+async function displayRecommendations(username, minTier, maxTier) {
     try {
         dataCollection.resetDataManager();
 
-        const levelRecs = await dataCollection.getRecommendations(username);
+        const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier);
+
+        for (const levelID of levelRecs) {
+            await addLevelCard(levelID);
+            console.log(`creating card for level ID: ${levelID}`);
+        }
 
     } catch (err) {
         errorMsg(err.message);
@@ -48,10 +61,52 @@ async function displayRecommendations(username) {
     }
 }
 
+/**
+ * 
+ * @param {string} string 
+ * @param {number} min 
+ * @param {number} max 
+ * @returns 
+ */
+function purifyInt(string, min = -Infinity, max = Infinity) {
+    let float = parseFloat(string);
+    float = Math.max(Math.min(float, max), min);
+    return (isNaN(float) ? min : Math.round(float));
+}
+
+/**
+ * 
+ * @param {FormData} formData 
+ * @returns 
+ */
+function purifyFormData(formData) {
+    const purifiedData = {
+        minTier: dataCollection.DEFAULT_MIN_TIER,
+        maxTier: dataCollection.DEFAULT_MAX_TIER,
+        username: ""
+    }
+
+    purifiedData.username = formData.get("username").trim();
+
+    if (purifiedData.username === "") {
+        throw new Error("Username can't be blank!");
+
+    }
+
+    purifiedData.minTier = purifyInt(formData.get("min-tier"), dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
+    purifiedData.maxTier = purifyInt(formData.get("max-tier"), dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
+
+    return purifiedData;
+}
+
 // elements
+const levelCardTemplate = document.getElementById("level-card-template");
+
 const form = document.getElementById("form");
 const submitButton = document.getElementById("submit-button");
 const usernameField = document.getElementById("username-field");
+
+const recommendationsContainer = document.getElementById("recommendations-container");
 
 const errorMessageText = document.getElementById("error-message-text");
 
@@ -59,14 +114,15 @@ const errorMessageText = document.getElementById("error-message-text");
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const formData = new FormData(form);
+    try {
+        const formData = purifyFormData(new FormData(form));
+    
+        await displayRecommendations(formData.username, formData.minTier, formData.maxTier);
 
-    if (formData.get("username") === "") {
-        errorMsg("Username can't be blank!");
-        return;
+    } catch (err) {
+        errorMsg(err.message);
+
     }
-
-    await displayRecommendations(formData.get("username"));
 });
 
 tick(0);

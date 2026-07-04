@@ -8,9 +8,25 @@
         <title>Geometry Dash Level Recommender</title>
     </head>
     <body>
+        <template id="level-card-template">
+            <div class="level-card vertical-flex">
+                <h3>Loading Level ID: <span class="level-id">?</span></h3>
+                <div class="tier-enjoyment-display">
+                    <div>T<span class="tier">?</span></div>
+                    <div>E<span class="enjoyment">?</span></div>
+                </div>
+            </div>
+        </template>
+
         <div id="app">
             <form id="form">
-                <input type="text" id="username-field" name="username">
+                <div><label for="min-tier-field">Minimum Tier</label>
+                <input type="text" id="min-tier-field" name="min-tier" class="small-text-field"></div>
+                <div><label for="max-tier-field">Maximum Tier</label>
+                <input type="text" id="max-tier-field" name="max-tier" class="small-text-field"></div>
+                <div><label for="username-field">GDDL Username</label>
+                <input type="text" id="username-field" name="username" class="medium-text-field"></div>
+                
                 <button type="submit" id="submit-button">Retrieve Ratings</button>
             </form>
 
@@ -20,8 +36,6 @@
 
             <div id="recommendations-container" class="blending-shadow vertical-flex">
                 <h2>Your recommended levels</h2>
-                <div class="level-card"></div>
-                <div class="level-card"></div>
             </div>
         </div>
         

@@ -145,9 +145,42 @@ p {
   }
 }
 
+@keyframes slideRightAndFadeIn {
+  0% {
+    transform: perspective(300px) translateX(-67px) translateZ(20px);
+    opacity: 0%;
+  }
+
+  100% {
+    transform: translateX(0px) translateZ(0px);
+    opacity: 100%;
+  }
+}
+
 .display-and-fade-out {
     display: block;
     animation: displayAndFadeOut 5s forwards;
+}
+
+.slide-right-and-fade-in {
+  transform: perspective(367px);
+  animation: slideRightAndFadeIn 1.2s ease-out forwards
+}
+
+.bolded {
+  font-weight: bold;
+}
+
+.underline {
+  text-decoration: underline;
+}
+
+.horizontal-flex {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  align-items: center;
 }
 
 .vertical-flex {
