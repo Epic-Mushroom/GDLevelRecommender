@@ -1,37 +1,37 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
-import {getNSmallest} from "./utils.js";
+import {getNSmallest, sleep} from "./utils.js";
 
 const GDDL_API_URL = "https://gdladder.com/api";
 const ALT_BASE_URL = "/api"; // for redirects
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
-const RATE_LIMIT_DELAY_MS = 0;
+const RATE_LIMIT_DELAY_MS = 3000;
 
 const DEBUG_USERNAME = "DEBUGDEBUG93229"; // entering this username will use debug data
 
 export const SKILLS_MAPPING = new Map([
-    ["Cube", "cu"],
-    ["Ship", "sh"],
-    ["Ball", "b"],
-    ["UFO", "u"],
-    ["Wave", "w"],
-    ["Robot", "r"],
-    ["Spider", "so"],
-    ["Swing", "sw"],
-    ["Nerve Control", "xl"],
-    ["Memory", "limbo"],
-    ["Learny", "l"],
-    ["Duals", "d"],
-    ["Chokepoints", "badgp"],
-    ["High CPS", "wasu"],
-    ["Timings", "heliopolis"],
-    ["Flow", "fl"],
-    ["Overall", "ov"],
-    ["Gimmicky", "g"],
-    ["Fast-Paced", "fast"],
-    ["Slow-Paced", "slow"],
-    [null, "unknown"]
+    ["Cube", "1"],
+    ["Ship", "2"],
+    ["Ball", "3"],
+    ["UFO", "4"],
+    ["Wave", "5"],
+    ["Robot", "6"],
+    ["Spider", "7"],
+    ["Swing", "20"],
+    ["Nerve Control", "8"],
+    ["Memory", "9"],
+    ["Learny", "10"],
+    ["Duals", "11"],
+    ["Chokepoints", "12"],
+    ["High CPS", "13"],
+    ["Timings", "14"],
+    ["Flow", "15"],
+    ["Overall", "16"],
+    ["Gimmicky", "17"],
+    ["Fast-Paced", "18"],
+    ["Slow-Paced", "19"],
+    [null, "0"]
 ]);
 
 // max how many api calls to make concurrently, only used in some stages
@@ -115,7 +115,7 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
         trackers.numAPIErrors++;
 
         // if (response.status === 429 && !retried) {
-        //     console.log("rate limited... waiting 0 seconds");
+        //     console.log("rate limited... waiting 3 seconds");
         //     await sleep(RATE_LIMIT_DELAY_MS);
         //     return await getAPIResponse(pathVariables, queryParams, true);
         // }
@@ -158,19 +158,30 @@ async function requestUserProfile(userID) {
     return response;
 }
 
-async function requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection) {
-    const response = await getAPIResponse(["user", userID, "submissions"], {
-        minTier: Math.max(Math.round(minTier), DEFAULT_MIN_TIER),
-        maxTier: Math.min(Math.round(maxTier), DEFAULT_MAX_TIER),
-        limit: NUM_SUBMISSIONS_PER_USER_PAGE,
-        page: pageNum,
-        sort: sortMethod,
-        sortDirection: sortDirection,
-        onlyIncomplete: false,
-        pending: false
-    });
+async function requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
+    if (includeTier) {
+        return await getAPIResponse(["user", userID, "submissions"], {
+            minTier: Math.max(Math.round(minTier), DEFAULT_MIN_TIER),
+            maxTier: Math.min(Math.round(maxTier), DEFAULT_MAX_TIER),
+            limit: NUM_SUBMISSIONS_PER_USER_PAGE,
+            page: pageNum,
+            sort: sortMethod,
+            sortDirection: sortDirection,
+            onlyIncomplete: false,
+            pending: false
+        });
 
-    return response;
+    } else {
+        return await getAPIResponse(["user", userID, "submissions"], {
+            limit: NUM_SUBMISSIONS_PER_USER_PAGE,
+            page: pageNum,
+            sort: sortMethod,
+            sortDirection: sortDirection,
+            onlyIncomplete: false,
+            pending: false
+        });
+
+    }
 }
 
 export async function requestLevelInfo(levelID) {
@@ -200,18 +211,29 @@ async function requestLevelSkills(levelID) {
 
 // reformats the API response into something more usable
 export async function getLevelSkills(levelID, limit = null) {
-    const tags = await requestLevelSkills(levelID);
-    const skillsMap = new Map(); // each skill by id mapped to num of votes
+    try {
+        const tags = await requestLevelSkills(levelID);
+        const skillsMap = new Map(); // each skill by id mapped to num of votes
 
-    for (const tag of tags) {
-        const skillName = SKILLS_MAPPING.get(tag.Tag.Name);
-        skillsMap.set(skillName, tag.ReactCount);
-    }
+        for (const tag of tags) {
+            const skillIDString = SKILLS_MAPPING.get(tag.Tag.Name);
+            skillsMap.set(skillIDString, tag.ReactCount);
+        }
 
-    if (limit == null) {
-        return skillsMap;
-    } else {
-        return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+        if (limit == null) {
+            return skillsMap;
+        } else {
+            return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+        }
+
+    } catch (err) {
+        if (err.name === "APIError" && err.status === 429) {
+            return [];
+
+        } else {
+            throw err;
+
+        }
     }
 }
 
@@ -258,12 +280,12 @@ async function registerUserSubmissions(
     const promiseArr = [];
 
     // find the max page first by making a request to the first page
-    const response = await requestUserSubmissions(userID, minTier, maxTier, 0, sortMethod, sortDirection);
+    const response = await requestUserSubmissions(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
     registration(response); // register first page of submissions
     const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
 
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-        promiseArr.push(requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection).then(registration));
+        promiseArr.push(requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration));
     }
 
     await Promise.allSettled(promiseArr);

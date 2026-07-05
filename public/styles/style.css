@@ -304,7 +304,7 @@ p {
   max-width: 80vw;
   display: none;
 
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
     "title title";
   place-items: center;
@@ -312,6 +312,10 @@ p {
 
 #recommendations-container > h2 {
   grid-area: title;
+}
+
+#recommendations-container > * {
+  max-width: calc(100% - 5px);
 }
 
 .level-card {
@@ -348,6 +352,8 @@ p {
   border: inherit;
 
   padding: 5px 14px;
+
+  max-width: calc(100% - 5px);
 }
 
 #error-message-text {
