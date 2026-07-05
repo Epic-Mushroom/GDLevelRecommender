@@ -34,6 +34,9 @@ export const SKILLS_MAPPING = new Map([
     [null, "unknown"]
 ]);
 
+// max how many api calls to make concurrently, only used in some stages
+const MAX_BATCH_REQUEST_SIZE = 13;
+
 const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
 const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 
@@ -230,15 +233,7 @@ async function registerUserSubmissions(
 
     let numSubmissionsRegistered = 0;
 
-    for (let pageNum = 0; pageNum < 999; pageNum++) {
-        let limitReached = false;
-
-        const response = await requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection);
-
-        if (response.submissions == null || response.submissions.length === 0) {
-            break;
-        }
-
+    const registration = (response) => {
         for (const submission of response.submissions) {
             if (isOther) {
                 dataManager.addOtherUserEnjRating(
@@ -255,18 +250,23 @@ async function registerUserSubmissions(
             }
 
             numSubmissionsRegistered++;
-            if (numSubmissionsRegistered >= limit) {
-                limitReached = true;
-                break;
-            }
         }
 
-        if (limitReached) {
-            break;
-        }
-
-        // console.log(`${numSubmissionsRegistered} submissions registered so far`);
+        // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
     }
+
+    const promiseArr = [];
+
+    // find the max page first by making a request to the first page
+    const response = await requestUserSubmissions(userID, minTier, maxTier, 0, sortMethod, sortDirection);
+    registration(response); // register first page of submissions
+    const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
+
+    for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
+        promiseArr.push(requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection).then(registration));
+    }
+
+    await Promise.allSettled(promiseArr);
 
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
@@ -294,22 +294,38 @@ async function registerAllOtherUserCommonSubmissions() {
                 continue;
             }
 
-            for (let pageNum = 0; pageNum < Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE); pageNum++) {
-                const response = await requestLevelSubmissions(levelID, pageNum);
+            let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
 
-                for (const submission of response.submissions) {
-                    if (submission.Enjoyment == null) {
-                        continue;
+            for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
+                if (promiseArr.length >= MAX_BATCH_REQUEST_SIZE) {
+                    await Promise.allSettled(promiseArr);
+
+                    for (let i = 0; i < MAX_BATCH_REQUEST_SIZE; i++) {
+                        promiseArr.pop();
                     }
-
-                    // this will NOT add level metadata (actual rating, actual enj, level name) since those
-                    // values aren't present in the level/ID/submissions request for some reason
-                    dataManager.addOtherUserEnjRating(
-                        submission.UserID, submission.User.Name, levelID, submission.Enjoyment
-                    );
-                    numSubmissionsThisLevelRegistered++;
-                    numTotalSubmissionsRegistered++;
                 }
+
+                promiseArr.push(requestLevelSubmissions(levelID, pageNum).then((response) => {
+                    // this won't work inside a .then block
+                    // if (response.total < MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL) {
+                    //     maxPageNum = Math.ceil(response.total * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1
+                    // }
+
+                    for (const submission of response.submissions) {
+                        if (submission.Enjoyment == null) {
+                            continue;
+                        }
+
+                        // this will NOT add level metadata (actual rating, actual enj, level name) since those
+                        // values aren't present in the level/ID/submissions request for some reason
+                        dataManager.addOtherUserEnjRating(
+                            submission.UserID, submission.User.Name, levelID, submission.Enjoyment
+                        );
+                        numSubmissionsThisLevelRegistered++;
+                        numTotalSubmissionsRegistered++;
+                    }
+                }));
+                
             }
 
             levelsPerEnjoyment[mainUserEnjRating]++;
@@ -349,11 +365,11 @@ async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTi
     const promiseArr = [];
 
     for (const otherUserEnjProfile of otherUsersArr) {
-        console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
+        // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
 
         // more compatible users -> register their higher enjoyments first (opposite for less compatible users)
         const sortDirection = (otherUserEnjProfile.calculateCompatThreshold() >= 50) ? "desc" : "asc";
-        
+
         promiseArr.push(registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
             maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection
         ));
@@ -425,6 +441,9 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log("added all weights");
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 5 TIME ELAPSED: ${timeElapsedPerStage[5]}ms`);
+
+    const totalTimeElapsed = timeElapsedPerStage.reduce(((acc, elem) => acc + elem), 0);
+    console.log(`TOTAL TIME ELAPSED: ${totalTimeElapsed}ms`);
 
     return dataManager.getMostRecommendedLevels();
 }

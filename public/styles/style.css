@@ -102,8 +102,8 @@ p {
 }
 
 #app {
-  width: 1920px;
-  max-width: 100%;
+  width: 100vw;
+  max-width: 100vw;
   margin: 0 auto;
   text-align: center;
   border-inline: 1px solid var(--border);
@@ -316,7 +316,6 @@ p {
 
 .level-card {
   width: 640px;
-  max-width: 80vw;
   height: 295px;
 
   border-radius: 30px;
