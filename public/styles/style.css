@@ -10,6 +10,11 @@
     initial-value: #4aa9c4;
 }
 
+@font-face {
+  font-family: "Milker";
+  src: url("fonts/Milker.otf") format("otf");
+}
+
 * {
   box-sizing: border-box;
 }
@@ -223,6 +228,19 @@ p {
 
 .blending-shadow {
   text-shadow: 3px 3px 9px rgba(0, 0, 0, 0.15);
+}
+
+.title-text {
+  font-size: 120px;
+  line-height: 167%;
+
+  font-family: "Milker", var(--sans);
+}
+
+.splash-text {
+  color: yellow;
+  font-size: 150%;
+  line-height: 140%;
 }
 
 #form {
