@@ -90,6 +90,9 @@ class APIError extends Error {
         this.status = status;
     }
 }
+
+
+
 /**
  * 
  * @param {Array<string>} pathVariables 
@@ -260,13 +263,13 @@ async function registerUserSubmissions(
             if (isOther) {
                 dataManager.addOtherUserEnjRating(
                     userID, username, submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-                    submission.Level.Enjoyment, submission.Level.Meta.Name
+                    submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher.name
                 );
 
             } else {
                 dataManager.addMainUserEnjRating(
                     submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-                    submission.Level.Enjoyment, submission.Level.Meta.Name
+                    submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher.name
                 );
 
             }

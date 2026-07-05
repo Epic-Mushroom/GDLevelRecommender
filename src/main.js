@@ -51,6 +51,7 @@ async function addLevelCard(levelID, levelInfo) {
     const levelCard = levelCardFragment.querySelector(".level-card");
     const skillCard = levelCardFragment.querySelector(".skills-display");
     const levelName = levelCardFragment.querySelector(".level-name");
+    const authorName = levelCardFragment.querySelector(".author-name");
     const tier = levelCardFragment.querySelector(".tier");
     const enj = levelCardFragment.querySelector(".enjoyment");
 
@@ -66,6 +67,7 @@ async function addLevelCard(levelID, levelInfo) {
     });
 
     levelName.textContent = levelInfo.levelName;
+    authorName.textContent = levelInfo.levelAuthor;
     tier.textContent = Math.round(levelInfo.actualRating);
     enj.textContent = Math.round(levelInfo.actualEnj);
 

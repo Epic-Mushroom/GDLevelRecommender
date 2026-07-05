@@ -222,16 +222,16 @@ class DataManager {
         /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
-         * @type {Map<number, {weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string}}>}
+         * @type {Map<number, {weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}}>}
          */
         this.levelWeightsMap = new Map();
     }
 
-    addMainUserEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName) {
-        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName);
+    addMainUserEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {
+        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor);
     }
 
-    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, actualRating, actualEnj, levelName) {
+    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {
         if (otherUserID === this.mainUserEnjProfile.userID) {
             return null;
         }
@@ -244,7 +244,7 @@ class DataManager {
             this.otherUserEnjProfileMap.set(otherUserID, new EnjoymentProfile(otherUserID, otherUsername, true));
         }
 
-        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName);
+        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor);
     }
 
     calculateCompatsAndThresholds() {
@@ -318,7 +318,7 @@ class DataManager {
                 const enjRating = ratingInfo.enjoyment;
                 const actualRating = ratingInfo.actualRating;
                 const calculatedWeight = calculateWeight(enjRating, actualRating, minTier, maxTier, otherUserEnjProfile.compatThreshold);
-                this.addWeight(levelID, calculatedWeight, {actualRating: actualRating, actualEnj: ratingInfo.actualEnj, levelName: ratingInfo.levelName});
+                this.addWeight(levelID, calculatedWeight, ratingInfo);
             }
         }
     }
