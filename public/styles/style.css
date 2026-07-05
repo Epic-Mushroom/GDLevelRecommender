@@ -300,13 +300,24 @@ p {
 }
 
 #recommendations-container {
+  width: 1300px;
+  max-width: 80vw;
   display: none;
+
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-areas:
+    "title title";
+  place-items: center;
+}
+
+#recommendations-container > h2 {
+  grid-area: title;
 }
 
 .level-card {
   width: 640px;
   max-width: 80vw;
-  height: 395px;
+  height: 295px;
 
   border-radius: 30px;
   border: 3px solid rgba(0, 0, 0, 0.25);

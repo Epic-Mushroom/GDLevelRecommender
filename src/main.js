@@ -81,7 +81,7 @@ async function displayRecommendations(username, minTier, maxTier) {
     recommendationsContainer.replaceChildren();
 
     const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier);
-    recommendationsContainer.style.setProperty("display", "flex");
+    recommendationsContainer.style.setProperty("display", "grid");
 
     const h2 = document.createElement("h2");
     h2.textContent = (levelRecs.length > 0) ? "Your recommended levels" : "Wasn't able to get any recommendations :(";
