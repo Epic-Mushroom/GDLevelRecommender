@@ -3,12 +3,18 @@ import {getRandomInt, getNSmallest} from "./utils.js";
 const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
 
-const BASE_COMPAT = 150;
-const ENJ_DIFFERENCE_FACTOR = 50;
-
 // up to [this value] users will be put into the database
 export const MAX_OTHER_USERS_TO_TRACK = 1999;
 
+const BASE_COMPAT = 150;
+const ENJ_DIFFERENCE_FACTOR = 50;
+// multiplies the compat value if a certain number of levels are in common
+// this is to prevent people who have 1 level in common getting a very high compat
+const HIGH_NUM_COMMON_LEVELS_MULTIPLIER = 3.0;
+const MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER = 5;
+const MAX_COMPAT = BASE_COMPAT * HIGH_NUM_COMMON_LEVELS_MULTIPLIER;
+
+// ======================== OLD WEIGHT FORMULA IGNORE THIS ========================
 // step 1 weight calc formula: B + enjoyment * M
 const STEP_1_WEIGHT_CALC_B = -500;
 const STEP_1_WEIGHT_CALC_M = 100;
@@ -19,11 +25,12 @@ const STEP_1_WEIGHT_CALC_M = 100;
 // if other user likes a level, and high compatibility, increase the weight
 // if other user doesn't like a level, and high compat, decrease the weight
 // if other user likes a level, and low compat, decrease the weight
-// if other user doesn't like a level, and low compat, increase the weight
+// if other user doesn't like a level, and low compat, increase the weight <=== THIS IS NOT A GOOD IDEA
 const STEP_2_WEIGHT_CALC_M = 1.3;
 const STEP_2_WEIGHT_CALC_N = 1.5;
 const STEP_2_WEIGHT_CALC_P = 1.2;
 const STEP_2_WEIGHT_CALC_B = -260;
+const STEP_2_WEIGHT_CALC_P2 = 2.0;
 
 /**
  * 
@@ -35,9 +42,20 @@ const STEP_2_WEIGHT_CALC_B = -260;
  * @returns 
  */
 export function calculateWeight(enjoyment, rating, minTier, maxTier, compatThreshold) {
+    // old formula (very complex and honestly not even good)
+    // const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
+    // const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
+    // let cumulativeResult = step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * compatThreshold) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
+
+    // if (rating < minTier || rating > maxTier) {
+    //     cumulativeResult -= 99999;
+    // }
+
+    // new formula
+    let cumulativeResult = 0;
     const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
-    const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
-    let cumulativeResult = step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * compatThreshold) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
+    const compatMultiplier = (compatThreshold / 100.0) ** STEP_2_WEIGHT_CALC_P2;
+    cumulativeResult += step1Result * compatMultiplier
 
     if (rating < minTier || rating > maxTier) {
         cumulativeResult -= 99999;
@@ -125,8 +143,8 @@ export class EnjoymentProfile {
         }
 
         if (!this.isOther) {
-            this.compat = BASE_COMPAT;
-            return BASE_COMPAT;
+            this.compat = MAX_COMPAT;
+            return MAX_COMPAT;
         }
 
         let totalCompat = 0;
@@ -151,7 +169,7 @@ export class EnjoymentProfile {
             return null;
         }
 
-        this.compat = totalCompat * 1.0 / numCommonLevels;
+        this.compat = ((numCommonLevels >= MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER) ? HIGH_NUM_COMMON_LEVELS_MULTIPLIER : 1.0) * totalCompat / numCommonLevels;
         return this.compat;
     }
 
@@ -278,8 +296,12 @@ class DataManager {
             this.levelWeightsMap.set(levelID, {weight: weight, numRatings: 1, levelInfo: levelInfo});
 
         } else {
-            const newWeight = (this.levelWeightsMap.get(levelID).weight * this.levelWeightsMap.get(levelID).numRatings + weight) * (1.0 / (this.levelWeightsMap.get(levelID).numRatings + 1));
-            this.levelWeightsMap.set(levelID, {weight: newWeight, numRatings: this.levelWeightsMap.get(levelID).numRatings + 1, levelInfo: levelInfo})
+            const oldWeight = this.levelWeightsMap.get(levelID).weight;
+            const oldNumRatings = this.levelWeightsMap.get(levelID).numRatings;
+
+            // dampened sum to prevent unpopularity bias
+            const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(oldNumRatings + 1)));
+            this.levelWeightsMap.set(levelID, {weight: newWeight, numRatings: oldNumRatings + 1, levelInfo: levelInfo})
 
         }
 
@@ -321,19 +343,19 @@ class DataManager {
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, 3); 
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, 5); 
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28, 6, "Digital Descent"); // Digital Descent
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21); // Azurite sillow
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5); // Lazurite
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24); // Azurite royen
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21, 5, "Azurite sillow"); // Azurite sillow
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5, 5, "Lazurite"); // Lazurite
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24, 5, "Azurite royen"); // Azurite royen
 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, 3);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, 3);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, 5);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28, 6, "Digital Descent"); // Digital Descent
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21); // Azurite sillow
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24); // Heavens Door
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28); // Ethereal Artifice
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, 30); // Next Stage
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62869408, 7, 29); // Chromatic Haze
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21, 5, "Azurite sillow"); // Azurite sillow
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24, 10, "Heavens Door"); // Heavens Door
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28, 8, "Ethereal artifice"); // Ethereal Artifice
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, 30, 5, "next stage"); // Next Stage
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62869408, 7, 29, 7, "chaze"); // Chromatic Haze
     }
 }
 
