@@ -34,9 +34,6 @@ export const SKILLS_MAPPING = new Map([
     [null, "0"]
 ]);
 
-// max how many api calls to make concurrently, only used in some stages
-const MAX_BATCH_REQUEST_SIZE = 13;
-
 const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
 const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 
@@ -46,36 +43,67 @@ export const DEFAULT_MAX_TIER = 39;
 const DEFAULT_MAIN_USER_SUBMISSIONS_SORT = "enjoyment";
 const DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 // at max how many of the main user's rated levels per enjoyment rating are sent an api request
-// for example if the user has 140 levels rated an 8/10 only [this value] levels will be sent a request
+// for example if the user has 140 levels rated an 8/10, only [this value] 8/10 levels will be sent a request
 // this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
 const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
 // at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
 // a globillion requests total and we don't want that 
-const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 120; 
+const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90; 
 // for sorting when gathering submissions from level page
 const DEFAULT_SUBMISSIONS_SORT = "dateAdded";
 const DEFAULT_SUBMISSIONS_SORT_DIRECTION = "asc";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 26;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 20;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
 // up to [this value] levels from other users will be tracked
 const MAX_OTHER_USER_SUBMISSIONS = 50;
 // for sorting when gathering submissions from other users' pages
-const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "enjoyment";
+const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "levelRating";
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 
-const trackers = {
+export const trackers = {
     numAPICalls: 0,
     numAPISuccesses: 0,
     numAPIErrors: 0
 }
 
-const flags = {
+export const flags = {
 
 };
+
+class Semaphore {
+    // max how many api calls to make concurrently
+    static MAX_BATCH_REQUEST_SIZE = 7;
+
+    constructor() {
+        this.numActiveRequests = 0;
+        this.queuedRequests = [];
+    }
+
+    async addRequestURL(requestURL) {
+        if (this.numActiveRequests >= Semaphore.MAX_BATCH_REQUEST_SIZE) {
+            await new Promise(resolve => this.queuedRequests.push(resolve));
+        }
+
+        this.numActiveRequests++;
+        try {
+            const response = await fetch(requestURL);
+            return response;
+
+        } finally {
+            this.numActiveRequests--;
+
+            if (this.queuedRequests.length > 0) {
+                this.queuedRequests.shift()();
+            }
+        }
+    }
+}
+
+const semaphore = new Semaphore();
 
 class APIError extends Error {
     /**
@@ -90,8 +118,6 @@ class APIError extends Error {
         this.status = status;
     }
 }
-
-
 
 /**
  * 
@@ -110,18 +136,19 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
         resultURL += `?${query}`;
     }
 
-    const response = await fetch(resultURL);
+    const response = await semaphore.addRequestURL(resultURL);
     trackers.numAPICalls++;
 
     if (!response.ok) {
         const contentType = response.headers.get("content-type");
         trackers.numAPIErrors++;
 
-        // if (response.status === 429 && !retried) {
-        //     console.log("rate limited... waiting 3 seconds");
-        //     await sleep(RATE_LIMIT_DELAY_MS);
-        //     return await getAPIResponse(pathVariables, queryParams, true);
-        // }
+        if (response.status === 429 && !retried) {
+            console.log(`rate limit headers: ${response.headers}`);
+            console.log("rate limited... waiting 3 seconds");
+            await sleep(RATE_LIMIT_DELAY_MS);
+            return await getAPIResponse(pathVariables, queryParams, true);
+        }
 
         if (contentType && contentType.includes("application/json")) {
             throw new APIError(response.status, `${response.status}: ${(await response.json()).message}`);
@@ -260,17 +287,16 @@ async function registerUserSubmissions(
 
     const registration = (response) => {
         for (const submission of response.submissions) {
+            const argsData = [
+                submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
+                submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher?.name
+            ]
+
             if (isOther) {
-                dataManager.addOtherUserEnjRating(
-                    userID, username, submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-                    submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher.name
-                );
+                dataManager.addOtherUserEnjRating(userID, username, ...argsData);
 
             } else {
-                dataManager.addMainUserEnjRating(
-                    submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-                    submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher.name
-                );
+                dataManager.addMainUserEnjRating(...argsData);
 
             }
 
@@ -280,18 +306,14 @@ async function registerUserSubmissions(
         // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
     }
 
-    const promiseArr = [];
-
     // find the max page first by making a request to the first page
     const response = await requestUserSubmissions(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
     registration(response); // register first page of submissions
     const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
 
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-        promiseArr.push(requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration));
+        await requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration);
     }
-
-    await Promise.allSettled(promiseArr);
 
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
@@ -300,8 +322,6 @@ async function registerAllOtherUserCommonSubmissions() {
     let numTotalSubmissionsRegistered = 0;
     // index = enjoyment
     const levelsPerEnjoyment = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    
-    const promiseArr = [];
 
     console.log("attempting to register all other users' common submissions");
 
@@ -322,15 +342,8 @@ async function registerAllOtherUserCommonSubmissions() {
             let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
 
             for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
-                if (promiseArr.length >= MAX_BATCH_REQUEST_SIZE) {
-                    await Promise.allSettled(promiseArr);
 
-                    for (let i = 0; i < MAX_BATCH_REQUEST_SIZE; i++) {
-                        promiseArr.pop();
-                    }
-                }
-
-                promiseArr.push(requestLevelSubmissions(levelID, pageNum).then((response) => {
+                await requestLevelSubmissions(levelID, pageNum).then((response) => {
                     // this won't work inside a .then block
                     // if (response.total < MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL) {
                     //     maxPageNum = Math.ceil(response.total * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1
@@ -349,7 +362,7 @@ async function registerAllOtherUserCommonSubmissions() {
                         numSubmissionsThisLevelRegistered++;
                         numTotalSubmissionsRegistered++;
                     }
-                }));
+                });
                 
             }
 
@@ -374,20 +387,16 @@ async function registerAllOtherUserCommonSubmissions() {
         // console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
     }
 
-    await Promise.allSettled(promiseArr);
     console.log(`registered ${numTotalSubmissionsRegistered} submissions from all other users`);
 }
 
 async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, usersLimit = MAX_OTHER_USERS_TO_COLLECT_FROM, submissionsLimit = MAX_OTHER_USER_SUBMISSIONS, sortMethod = DEFAULT_OTHER_USER_SUBMISSIONS_SORT) {
     // this method won't work unless you've already pre-calculated compats and thresholds before
     const otherUsersArr = [];
-    otherUsersArr.push(...dataManager.getLeastCompatiblePlayers(usersLimit / 2));
-    otherUsersArr.push(...dataManager.getMostCompatiblePlayers(usersLimit - usersLimit / 2));
+    otherUsersArr.push(...dataManager.getMostCompatiblePlayers(usersLimit));
 
     // use this method if calculating compats and thresholds is to be done later
     // const otherUsersArr = dataManager.getMostCommonPlayers(usersLimit);
-    
-    const promiseArr = [];
 
     for (const otherUserEnjProfile of otherUsersArr) {
         // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
@@ -395,12 +404,11 @@ async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTi
         // more compatible users -> register their higher enjoyments first (opposite for less compatible users)
         const sortDirection = (otherUserEnjProfile.calculateCompatThreshold() >= 50) ? "desc" : "asc";
 
-        promiseArr.push(registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
+        await registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
             maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection
-        ));
+        );
     }
 
-    await Promise.allSettled(promiseArr);
 }
 
 export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {

@@ -4,7 +4,7 @@ const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
 
 // up to [this value] users will be put into the database
-export const MAX_OTHER_USERS_TO_TRACK = 1999;
+export const MAX_OTHER_USERS_TO_TRACK = 800;
 
 const BASE_COMPAT = 150;
 const ENJ_DIFFERENCE_FACTOR = 50;

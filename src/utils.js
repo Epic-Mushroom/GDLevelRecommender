@@ -1,3 +1,5 @@
+const MAX_BATCH_REQUEST_SIZE = 13;
+
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**

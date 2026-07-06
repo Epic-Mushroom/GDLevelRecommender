@@ -71,6 +71,11 @@ async function addLevelCard(levelID, levelInfo) {
     tier.textContent = Math.round(levelInfo.actualRating);
     enj.textContent = Math.round(levelInfo.actualEnj);
 
+    if (levelInfo.levelAuthor === "-") {
+        const author = levelCardFragment.querySelector(".author");
+        author.style.setProperty("display", "none");
+    }
+
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
 }
