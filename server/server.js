@@ -21,13 +21,20 @@ const UserSchema = new Schema({
 }, {_id: false});
 const User = model("User", UserSchema);
 
+const SkillSchema = new Schema({
+    tagID: {type: Number, required: true},
+    count: Number
+}, {_id: false});
+
 const LevelSchema = new Schema({
     levelID: {type: Number, required: true, unique: true},
     n: String, // level name
+    ec: Number, // enjoyment count
     a: String, // level author
     t: Number, // tier rating
-    e: Number // enj rating
-    // skills later
+    e: Number, // enj rating
+    sk: [SkillSchema], // list of skills
+    sub: [Number] // list of submitters' userIDs
 }, {_id: false});
 const Level = model("Level", LevelSchema);
 
@@ -96,6 +103,68 @@ async function updateUserID(userID) {
     return {userID: userID, ratings: ratings};
 }
 
+async function updateLevelID(levelID) {
+    const aggregateData = {
+        levelID: 1,
+        n: "Level", // level name
+        ec: 0, // enjoyment count
+        a: "-", // level author
+        t: 39, // tier rating
+        e: 10, // enj rating
+        sk: [], // list of skills
+        sub: [] // list of submitters' userIDs
+    };
+
+    // first call level/{levelID} to get Meta.Name (n), EnjoymentCount (ec), 
+    // Meta.Publisher?.name (a), Rating (t) (ROUND THIS to 2dp), 
+    // Enjoyment (e) (ALSO ROUND THIS TO 2dp)
+    const levelBaseData = await getGDDLResponse(["level", levelID], {}); 
+    aggregateData.levelID = levelID;
+    aggregateData.n = levelBaseData.Meta.Name;
+    aggregateData.ec = levelBaseData.EnjoymentCount;
+    aggregateData.a = levelBaseData.Meta.Publisher?.name;
+    aggregateData.t = Math.round(levelBaseData.Rating * 100) / 100;
+    aggregateData.e = Math.round(levelBaseData.Enjoyment * 100) / 100;
+
+    // then call level/{levelID}/submissions and COLLECT ONLY THE USERS IDS of the submitters
+    const maxPageNum = Math.ceil(aggregateData.ec * 1.0 / gddlAPI.NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
+    // math to get at most MAX_PAGES_TO_TRACK_PER_LEVEL pages but have the pages be evenly distributed
+    // so you don't just collect high enjoyment ratings for popular levels
+    const pageNumInc = Math.max(1, (maxPageNum + 1) * 1.0 / gddlAPI.MAX_PAGES_TO_TRACK_PER_LEVEL);
+
+    for (let pageNumF = 0; pageNumF <= maxPageNum; pageNumF = pageNumF + pageNumInc) {
+        const pageNum = Math.round(pageNumF);
+
+        const submissionData = await getGDDLResponse(["level", levelID, "submissions"], {
+            sort: "enjoyment",
+            sortDirection: "desc", 
+            twoPlayer: false,
+            progressFilter: "victors",
+            limit: gddlAPI.NUM_SUBMISSIONS_PER_LEVEL_PAGE,
+            page: pageNum
+        }); 
+
+        aggregateData.sub.push(...((submissionData.submissions).map((submission) => submission.UserID)));
+    }
+
+    // finally get tags/skills
+    const skillsData = await gddlAPI.getLevelSkills(levelID);
+    // convert the Map into a list of objects
+    for (const [skillIDString, reactCount] of skillsData) {
+        aggregateData.sk.push({tagID: parseInt(skillIDString), count: reactCount});
+    }
+
+    // update and return
+    await Level.findOneAndUpdate(
+        {levelID: levelID},
+        aggregateData,
+        {upsert: true}
+    );
+
+    console.log(`updated level data of level id ${levelID}`);
+    return aggregateData;
+}
+
 function getErrorDetails(err) {
     const errorDetails = {status: 500, message: ""};
 
@@ -156,6 +225,24 @@ app.get('/api/user/:userID', async (req, res) => {
         }
 
         res.json(user);
+
+    } catch (err) {
+        const errorDetails = getErrorDetails(err);
+
+        res.status(errorDetails.status).json({error: errorDetails.message});
+    }
+});
+app.get('/api/level/:levelID', async (req, res) => {
+    const id = parseInt(req.params.levelID);
+
+    try {
+        let level = await Level.findOne({levelID: id}, 'levelID n ec a t e sk sub -_id');
+
+        if (level == null) {
+            level = await updateLevelID(id);
+        }
+
+        res.json(level);
 
     } catch (err) {
         const errorDetails = getErrorDetails(err);

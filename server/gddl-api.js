@@ -1,12 +1,8 @@
 import {sleep, getNSmallest} from "./utils.js";
 
 const GDDL_API_URL = "https://gdladder.com/api";
-const ALT_BASE_URL = "/api"; // for redirects
-const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
 const RATE_LIMIT_DELAY_MS = 7000;
-
-const DEBUG_USERNAME = "DEBUGDEBUG93229"; // entering this username will use debug data
 
 export const SKILLS_MAPPING = new Map([
     ["Cube", "1"],
@@ -38,28 +34,9 @@ export const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 export const DEFAULT_MIN_TIER = 1;
 export const DEFAULT_MAX_TIER = 39;
 
-const DEFAULT_MAIN_USER_SUBMISSIONS_SORT = "enjoyment";
-const DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
-// at max how many of the main user's rated levels per enjoyment rating are sent an api request
-// for example if the user has 140 levels rated an 8/10, only [this value] 8/10 levels will be sent a request
-// this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
-const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
-// at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
-// a globillion requests total and we don't want that 
-const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90; 
+export const MAX_PAGES_TO_TRACK_PER_LEVEL = 15; 
 // for sorting when gathering submissions from level page
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
-// up to [this value] users will have their ratings collected
-// this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 20;
-// [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
-// this is because a user's sent rating is not always the same as the actual rating
-const TIER_RANGE_OFFSET = 5;
-// up to [this value] levels from other users will be tracked
-const MAX_OTHER_USER_SUBMISSIONS = 50;
-// for sorting when gathering submissions from other users' pages
-const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "levelRating";
-const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 
 export const trackers = {
     numAPICalls: 0,
