@@ -14,11 +14,11 @@ connect(MONGO_URI).then(() => console.log("connected to database"));
 
 const UserSchema = new Schema({
     userID: {type: Number, required: true, unique: true},
-    ratings: [{ 
+    ratings: [new Schema({ 
         l: Number, // level ID
         e: Number  // enjoyment rating
-    }]
-});
+    }, {_id: false})]
+}, {_id: false});
 const User = model("User", UserSchema);
 
 const LevelSchema = new Schema({
@@ -28,7 +28,7 @@ const LevelSchema = new Schema({
     t: Number, // tier rating
     e: Number // enj rating
     // skills later
-});
+}, {_id: false});
 const Level = model("Level", LevelSchema);
 
 class GDDLError extends Error {
@@ -128,12 +128,21 @@ function getErrorDetails(err) {
 
 app.get('/api/user', async (req, res) => {
     try {
-        const users = await User.find({}, 'userID ratings -_id');
+        let queryObject = {};
+
+        if (req.query.userIDs != null) {
+            const ids = req.query.userIDs.split(",").map(id => parseInt(id));
+
+            queryObject = {userID: {$in: ids}};
+        }
+
+        const users = await User.find(queryObject, 'userID ratings -_id');
         res.json(users);
 
     } catch (err) {
-        res.status(500).json({error: "failed to fetch data"});
+        const errorDetails = getErrorDetails(err);
 
+        res.status(errorDetails.status).json({error: errorDetails.message});
     }
 });
 app.get('/api/user/:userID', async (req, res) => {
