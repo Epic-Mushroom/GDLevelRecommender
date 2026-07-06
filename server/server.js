@@ -34,7 +34,7 @@ const LevelSchema = new Schema({
     t: Number, // tier rating
     e: Number, // enj rating
     sk: [SkillSchema], // list of skills
-    sub: [Number] // list of submitters' userIDs
+    sub: [[Number]] // 2d list of submitters' userIDs and corresp. enj ratings
 });
 const Level = model("Level", LevelSchema);
 
@@ -112,7 +112,7 @@ async function updateLevelID(levelID) {
         t: 39, // tier rating
         e: 10, // enj rating
         sk: [], // list of skills
-        sub: [] // list of submitters' userIDs
+        sub: [] // submitters' userIDs and corresp. enj ratings in a 2d array
     };
 
     // first call level/{levelID} to get Meta.Name (n), EnjoymentCount (ec), 
@@ -144,7 +144,7 @@ async function updateLevelID(levelID) {
             page: pageNum
         }); 
 
-        aggregateData.sub.push(...((submissionData.submissions).map((submission) => submission.UserID)));
+        aggregateData.sub.push(...((submissionData.submissions).map((submission) => [submission.UserID, submission.Enjoyment])));
     }
 
     // finally get tags/skills
@@ -187,8 +187,8 @@ function getErrorDetails(err) {
         errorDetails.message = `${err.status}: ${errorDetails.message}`;
 
     } else {
+        console.error(`server error: ${err.message}`);
         errorDetails.message = `non-gddl related error: ${err.message}`;
-        throw err;
 
     }
 
@@ -221,7 +221,7 @@ app.get('/api/user/:userID', async (req, res) => {
         let forceUpdate = false;
 
         if (req.query.forceUpdate != null) {
-            req.query.forceUpdate.trim().toLowerCase() === "true";
+            forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
         }
         
         let user = await User.findOne({userID: id}, '-_id');
@@ -245,7 +245,7 @@ app.get('/api/level/:levelID', async (req, res) => {
         let forceUpdate = false;
 
         if (req.query.forceUpdate != null) {
-            req.query.forceUpdate.trim().toLowerCase() === "true";
+            forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
         }
 
         let level = await Level.findOne({levelID: id}, '-_id');
