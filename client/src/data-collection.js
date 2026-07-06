@@ -6,7 +6,7 @@ const GDDL_API_URL = "https://gdladder.com/api";
 const ALT_BASE_URL = "/api"; // for redirects
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
-const RATE_LIMIT_DELAY_MS = 3000;
+const RATE_LIMIT_DELAY_MS = 250;
 
 const DEBUG_USERNAME = "DEBUGDEBUG93229"; // entering this username will use debug data
 
@@ -50,8 +50,7 @@ const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
 // a globillion requests total and we don't want that 
 const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90; 
 // for sorting when gathering submissions from level page
-const DEFAULT_SUBMISSIONS_SORT = "dateAdded";
-const DEFAULT_SUBMISSIONS_SORT_DIRECTION = "asc";
+const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
 const MAX_OTHER_USERS_TO_COLLECT_FROM = 20;
@@ -144,8 +143,7 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
         trackers.numAPIErrors++;
 
         if (response.status === 429 && !retried) {
-            console.log(`rate limit headers: ${response.headers}`);
-            console.log("rate limited... waiting 3 seconds");
+            console.log("rate limited... waiting 250 ms to retry");
             await sleep(RATE_LIMIT_DELAY_MS);
             return await getAPIResponse(pathVariables, queryParams, true);
         }
@@ -220,10 +218,10 @@ export async function requestLevelInfo(levelID) {
     return response;
 }
 
-async function requestLevelSubmissions(levelID, pageNum) {
+async function requestLevelSubmissions(levelID, pageNum, sortDirection) {
     const response = await getAPIResponse(["level", levelID, "submissions"], {
         sort: DEFAULT_SUBMISSIONS_SORT,
-        sortDirection: DEFAULT_SUBMISSIONS_SORT_DIRECTION,
+        sortDirection: sortDirection,
         twoPlayer: false,
         progressFilter: "victors",
         limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
@@ -342,13 +340,9 @@ async function registerAllOtherUserCommonSubmissions() {
             let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
 
             for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
+                const sortDirection = (mainUserEnjRating >= 6) ? "desc" : "asc";
 
-                await requestLevelSubmissions(levelID, pageNum).then((response) => {
-                    // this won't work inside a .then block
-                    // if (response.total < MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL) {
-                    //     maxPageNum = Math.ceil(response.total * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1
-                    // }
-
+                await requestLevelSubmissions(levelID, pageNum, sortDirection).then((response) => {
                     for (const submission of response.submissions) {
                         if (submission.Enjoyment == null) {
                             continue;
@@ -401,8 +395,7 @@ async function registerAllOtherUserSubmissions(minTier = DEFAULT_MIN_TIER, maxTi
     for (const otherUserEnjProfile of otherUsersArr) {
         // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
 
-        // more compatible users -> register their higher enjoyments first (opposite for less compatible users)
-        const sortDirection = (otherUserEnjProfile.calculateCompatThreshold() >= 50) ? "desc" : "asc";
+        const sortDirection = "desc";
 
         await registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
             maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection
