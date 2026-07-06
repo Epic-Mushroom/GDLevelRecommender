@@ -42,7 +42,7 @@ class GDDLError extends Error {
 
 async function getGDDLResponse(pathVariables, queryParams) {
     try {
-        const response = await gddlAPI.getAPIResponse(pathVariables, queryParams);
+        return await gddlAPI.getAPIResponse(pathVariables, queryParams);
 
     } catch (err) {
         if (err.name === "APIError") {
@@ -64,7 +64,7 @@ async function updateUserID(userID) {
             });
         }
 
-        console.log(`${ratings.length} submissions collected for id ${userID} so far`);
+        // console.log(`${ratings.length} submissions collected for id ${userID} so far`);
     }
 
     // find the max page first by making a request to the first page
@@ -80,7 +80,7 @@ async function updateUserID(userID) {
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
         await getGDDLResponse(["user", userID, "submissions"], {
             limit: gddlAPI.NUM_SUBMISSIONS_PER_USER_PAGE,
-            page: 0,
+            page: pageNum,
             onlyIncomplete: false,
             pending: false
         }).then(collection);
@@ -119,13 +119,14 @@ function getErrorDetails(err) {
 
     } else {
         errorDetails.message = `non-gddl related error: ${err.message}`;
+        throw err;
 
     }
 
     return errorDetails;
 }
 
-app.get('/api/users', async (req, res) => {
+app.get('/api/user', async (req, res) => {
     try {
         const users = await User.find({}, 'userID ratings -_id');
         res.json(users);
@@ -135,7 +136,7 @@ app.get('/api/users', async (req, res) => {
 
     }
 });
-app.get('/api/users/:userID', async (req, res) => {
+app.get('/api/user/:userID', async (req, res) => {
     const id = parseInt(req.params.userID);
 
     try {
