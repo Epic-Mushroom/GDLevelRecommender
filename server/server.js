@@ -18,7 +18,7 @@ const UserSchema = new Schema({
         l: Number, // level ID
         e: Number  // enjoyment rating
     }, {_id: false})]
-}, {_id: false});
+});
 const User = model("User", UserSchema);
 
 const SkillSchema = new Schema({
@@ -35,7 +35,7 @@ const LevelSchema = new Schema({
     e: Number, // enj rating
     sk: [SkillSchema], // list of skills
     sub: [Number] // list of submitters' userIDs
-}, {_id: false});
+});
 const Level = model("Level", LevelSchema);
 
 class GDDLError extends Error {
@@ -205,7 +205,7 @@ app.get('/api/user', async (req, res) => {
             queryObject = {userID: {$in: ids}};
         }
 
-        const users = await User.find(queryObject, 'userID ratings -_id');
+        const users = await User.find(queryObject, '-_id');
         res.json(users);
 
     } catch (err) {
@@ -218,9 +218,15 @@ app.get('/api/user/:userID', async (req, res) => {
     const id = parseInt(req.params.userID);
 
     try {
-        let user = await User.findOne({userID: id}, 'userID ratings -_id');
+        let forceUpdate = false;
 
-        if (user == null) {
+        if (req.query.forceUpdate != null) {
+            req.query.forceUpdate.trim().toLowerCase() === "true";
+        }
+        
+        let user = await User.findOne({userID: id}, '-_id');
+
+        if (user == null || forceUpdate) {
             user = await updateUserID(id);
         }
 
@@ -236,9 +242,15 @@ app.get('/api/level/:levelID', async (req, res) => {
     const id = parseInt(req.params.levelID);
 
     try {
-        let level = await Level.findOne({levelID: id}, 'levelID n ec a t e sk sub -_id');
+        let forceUpdate = false;
 
-        if (level == null) {
+        if (req.query.forceUpdate != null) {
+            req.query.forceUpdate.trim().toLowerCase() === "true";
+        }
+
+        let level = await Level.findOne({levelID: id}, '-_id');
+
+        if (level == null || forceUpdate) {
             level = await updateLevelID(id);
         }
 
