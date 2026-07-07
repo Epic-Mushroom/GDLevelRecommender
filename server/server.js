@@ -16,7 +16,8 @@ const UserSchema = new Schema({
     userID: {type: Number, required: true, unique: true},
     ratings: [new Schema({ 
         l: Number, // level ID
-        e: Number  // enjoyment rating
+        e: Number,  // enjoyment rating
+        at: Number // actual tier of the level
     }, {_id: false})]
 });
 const User = model("User", UserSchema);
@@ -67,7 +68,8 @@ async function updateUserID(userID) {
         for (const submission of response.submissions) {
             ratings.push({
                 l: submission.Level.ID,
-                e: submission.Enjoyment
+                e: submission.Enjoyment,
+                at: Math.round(submission.Level.Rating * 100.0) / 100
             });
         }
 
