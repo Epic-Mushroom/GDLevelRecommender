@@ -1,1 +1,2 @@
-/api/* https://gdladder.com/api/:splat  200
+/gddlapi/* https://gdladder.com/api/:splat 200
+/api/* https://gdlevelrecsdb.onrender.com/api/:splat 200

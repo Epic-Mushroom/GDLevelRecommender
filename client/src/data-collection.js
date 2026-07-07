@@ -2,8 +2,10 @@ import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
 import {getNSmallest, sleep} from "./utils.js";
 
+const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";// db that contains only necessary data for this site
 const GDDL_API_URL = "https://gdladder.com/api";
-const ALT_BASE_URL = "/api"; // for redirects
+const BACKEND_REDIRECT_URL = "/api"; // redirects to backend
+const GDDL_REDIRECT_URL = "/gddlapi"; // redirects to gddl api
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
 
 const RATE_LIMIT_DELAY_MS = 250;
@@ -123,8 +125,8 @@ class APIError extends Error {
  * @param {Array<string>} pathVariables 
  * @param {Object} queryParams 
  */
-async function getAPIResponse(pathVariables, queryParams, retried = false) {
-    let resultURL = ALT_BASE_URL;
+async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retried = false) {
+    let resultURL = (useGDDL) ? GDDL_REDIRECT_URL : BACKEND_REDIRECT_URL;
 
     for (const variable of pathVariables) {
         resultURL += `/${encodeURIComponent(variable)}`;
@@ -145,7 +147,7 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
         if (response.status === 429 && !retried) {
             console.log("rate limited... waiting 250 ms to retry");
             await sleep(RATE_LIMIT_DELAY_MS);
-            return await getAPIResponse(pathVariables, queryParams, true);
+            return await getAPIResponse(pathVariables, queryParams, useGDDL, true);
         }
 
         if (contentType && contentType.includes("application/json")) {
@@ -166,7 +168,7 @@ async function getAPIResponse(pathVariables, queryParams, retried = false) {
  * @param {string} username 
  */
 async function requestUserID(username) {
-    const response = await getAPIResponse(["user", "search"], {limit: 1, name: username});
+    const response = await getAPIResponse(["user", "search"], {limit: 1, name: username}, true);
 
     if (response.length === 0) {
         return null;
@@ -186,7 +188,7 @@ async function requestUserProfile(userID) {
     return response;
 }
 
-async function requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
+async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
     if (includeTier) {
         return await getAPIResponse(["user", userID, "submissions"], {
             minTier: Math.max(Math.round(minTier), DEFAULT_MIN_TIER),
@@ -197,7 +199,7 @@ async function requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMet
             sortDirection: sortDirection,
             onlyIncomplete: false,
             pending: false
-        });
+        }, true);
 
     } else {
         return await getAPIResponse(["user", userID, "submissions"], {
@@ -207,9 +209,16 @@ async function requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMet
             sortDirection: sortDirection,
             onlyIncomplete: false,
             pending: false
-        });
+        }, true);
 
     }
+}
+
+async function requestUserSubmissions(userID) {
+    const response = await getAPIResponse(["user", userID], {});
+    const ratingsArr = response.ratings;
+
+    return ratingsArr;
 }
 
 export async function requestLevelInfo(levelID) {
@@ -218,7 +227,7 @@ export async function requestLevelInfo(levelID) {
     return response;
 }
 
-async function requestLevelSubmissions(levelID, pageNum, sortDirection) {
+async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
     const response = await getAPIResponse(["level", levelID, "submissions"], {
         sort: DEFAULT_SUBMISSIONS_SORT,
         sortDirection: sortDirection,
@@ -226,26 +235,59 @@ async function requestLevelSubmissions(levelID, pageNum, sortDirection) {
         progressFilter: "victors",
         limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
         page: pageNum
-    });
+    }, true);
 
     return response;
 }
 
-async function requestLevelSkills(levelID) {
-    const response = await getAPIResponse(["level", levelID, "tags"], {});
+async function requestLevelVictors(levelID) {
+    const response = await getAPIResponse(["level", levelID], {});
+    const victorUserIDs = response.sub;
+
+    return victorUserIDs;
+}
+
+async function requestLevelSkillsGDDL(levelID) {
+    const response = await getAPIResponse(["level", levelID, "tags"], {}, true);
 
     return response;
 }
 
-// reformats the API response into something more usable
-export async function getLevelSkills(levelID, limit = null) {
+// reformats the GDDL API response into something more usable
+export async function getLevelSkillsGDDL(levelID, limit = null) {
     try {
-        const tags = await requestLevelSkills(levelID);
+        const tags = await requestLevelSkillsGDDL(levelID);
         const skillsMap = new Map(); // each skill by id mapped to num of votes
 
         for (const tag of tags) {
             const skillIDString = SKILLS_MAPPING.get(tag.Tag.Name);
             skillsMap.set(skillIDString, tag.ReactCount);
+        }
+
+        if (limit == null) {
+            return skillsMap;
+        } else {
+            return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+        }
+
+    } catch (err) {
+        if (err.name === "APIError" && err.status === 429) {
+            return [];
+
+        } else {
+            throw err;
+
+        }
+    }
+}
+
+export async function getLevelSkills(levelID, limit = null) {
+    try {
+        const levelInfo = await getAPIResponse(["level", levelID], {});
+        const skillsMap = new Map(); // each skill by id mapped to num of votes
+
+        for (const tag of levelInfo.sk) {
+            skillsMap.set(`${tag.tagID}`, tag.count);
         }
 
         if (limit == null) {
@@ -283,34 +325,64 @@ async function registerUserSubmissions(
 
     let numSubmissionsRegistered = 0;
 
-    const registration = (response) => {
-        for (const submission of response.submissions) {
-            const argsData = [
-                submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-                submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher?.name
-            ]
+    // const registration = (response) => {
+    //     for (const submission of response.submissions) {
+    //         const argsData = [
+    //             submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
+    //             submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher?.name
+    //         ]
 
-            if (isOther) {
-                dataManager.addOtherUserEnjRating(userID, username, ...argsData);
+    //         if (isOther) {
+    //             dataManager.addOtherUserEnjRating(userID, username, ...argsData);
 
-            } else {
-                dataManager.addMainUserEnjRating(...argsData);
+    //         } else {
+    //             dataManager.addMainUserEnjRating(...argsData);
 
-            }
+    //         }
 
-            numSubmissionsRegistered++;
+    //         numSubmissionsRegistered++;
+    //     }
+
+    //     // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
+    // }
+
+    // // find the max page first by making a request to the first page
+    // const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
+    // registration(response); // register first page of submissions
+    // const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
+
+    // for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
+    //     await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration);
+    // }
+
+    const allRatings = await requestUserSubmissions(userID);
+    for (const rating of allRatings) {
+        const levelInfoResponse = await requestLevelInfo(rating.l);
+        const levelInfo = {
+            actualRating: levelInfoResponse.t,
+            actualEnj: levelInfoResponse.e,
+            levelName: levelInfoResponse.n,
+            levelAuthor: levelInfoResponse.a
         }
 
-        // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
-    }
+        if (isOther) {
+            dataManager.addOtherUserEnjRating(
+                userID, username, rating.l, rating.e,
+                levelInfo.actualRating, levelInfo.actualEnj,
+                levelInfo.levelName, levelInfo.levelAuthor
+            );
 
-    // find the max page first by making a request to the first page
-    const response = await requestUserSubmissions(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
-    registration(response); // register first page of submissions
-    const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
+        } else {
+            dataManager.addMainUserEnjRating(
+                rating.l, rating.e,
+                levelInfo.actualRating, levelInfo.actualEnj,
+                levelInfo.levelName, levelInfo.levelAuthor
+            );
 
-    for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-        await requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration);
+        }
+
+        dataManager.addLevelInfo(rating.l, levelInfo);
+        numSubmissionsRegistered++;
     }
 
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
@@ -337,28 +409,32 @@ async function registerAllOtherUserCommonSubmissions() {
                 continue;
             }
 
-            let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
+            // let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
 
-            for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
-                const sortDirection = (mainUserEnjRating >= 6) ? "desc" : "asc";
+            // for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
+            //     const sortDirection = (mainUserEnjRating >= 6) ? "desc" : "asc";
 
-                await requestLevelSubmissions(levelID, pageNum, sortDirection).then((response) => {
-                    for (const submission of response.submissions) {
-                        if (submission.Enjoyment == null) {
-                            continue;
-                        }
+            //     await requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection).then((response) => {
+            //         for (const submission of response.submissions) {
+            //             if (submission.Enjoyment == null) {
+            //                 continue;
+            //             }
 
-                        // this will NOT add level metadata (actual rating, actual enj, level name) since those
-                        // values aren't present in the level/ID/submissions request for some reason
-                        dataManager.addOtherUserEnjRating(
-                            submission.UserID, submission.User.Name, levelID, submission.Enjoyment
-                        );
-                        numSubmissionsThisLevelRegistered++;
-                        numTotalSubmissionsRegistered++;
-                    }
-                });
+            //             // this will NOT add level metadata (actual rating, actual enj, level name) since those
+            //             // values aren't present in the level/ID/submissions request for some reason
+            //             dataManager.addOtherUserEnjRating(
+            //                 submission.UserID, submission.User.Name, levelID, submission.Enjoyment
+            //             );
+            //             numSubmissionsThisLevelRegistered++;
+            //             numTotalSubmissionsRegistered++;
+            //         }
+            //     });
                 
-            }
+            // }
+
+            requestLevelVictors(levelID).then((victorUserIDs) => {
+                // ...
+            });
 
             levelsPerEnjoyment[mainUserEnjRating]++;
 

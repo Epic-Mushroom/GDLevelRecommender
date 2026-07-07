@@ -220,11 +220,31 @@ class DataManager {
         // just contains the compatibility values of all collected players, used to calculate compat threshold
         this.compatArr = [];
         /**
+         * contains all the levels to be considered in calculation, which are the main user's completed levels
+         * and the levels completed by the other users who are collected
+         * @type {Map<number, {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
+         */
+        this.allRelevantLevelIDs = new Map();
+        /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
          * @type {Map<number, {weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}}>}
          */
         this.levelWeightsMap = new Map();
+    }
+
+    /**
+     * 
+     * @param {number} levelID 
+     * @param {{actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}} levelInfo 
+     */
+    addLevelInfo(levelID, levelInfo) {
+        if (this.allRelevantLevelIDs.has(levelID)) {
+            return;
+        }
+
+        this.allRelevantLevelIDs.set(levelID, levelInfo);
+        return levelInfo;
     }
 
     addMainUserEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {

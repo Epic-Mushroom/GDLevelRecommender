@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3001;
 
 // eslint-disable-next-line no-undef
 const MONGO_URI = process.env.MONGODB_URI;
-connect(MONGO_URI).then(() => console.log("connected to database"));
+connect(MONGO_URI).then(() => console.log("connected to database")).catch((err) => console.error(`failed to connect, error: ${err.message}`));
 
 const UserSchema = new Schema({
     userID: {type: Number, required: true, unique: true},
@@ -84,14 +84,17 @@ async function updateUserID(userID) {
     collection(response); // collect first page of submissions
     const maxPageNum = Math.ceil(response.total * 1.0 / gddlAPI.NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
 
+    const pageRequests = [];
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-        await getGDDLResponse(["user", userID, "submissions"], {
+        pageRequests.push(getGDDLResponse(["user", userID, "submissions"], {
             limit: gddlAPI.NUM_SUBMISSIONS_PER_USER_PAGE,
             page: pageNum,
             onlyIncomplete: false,
             pending: false
-        }).then(collection);
+        }).then(collection));
     }
+
+    await Promise.allSettled(pageRequests);
 
     await User.findOneAndUpdate(
         {userID: userID},
@@ -132,20 +135,24 @@ async function updateLevelID(levelID) {
     // so you don't just collect high enjoyment ratings for popular levels
     const pageNumInc = Math.max(1, (maxPageNum + 1) * 1.0 / gddlAPI.MAX_PAGES_TO_TRACK_PER_LEVEL);
 
+    const pageRequests = [];
     for (let pageNumF = 0; pageNumF <= maxPageNum; pageNumF = pageNumF + pageNumInc) {
         const pageNum = Math.round(pageNumF);
 
-        const submissionData = await getGDDLResponse(["level", levelID, "submissions"], {
+        pageRequests.push(getGDDLResponse(["level", levelID, "submissions"], {
             sort: "enjoyment",
             sortDirection: "desc", 
             twoPlayer: false,
             progressFilter: "victors",
             limit: gddlAPI.NUM_SUBMISSIONS_PER_LEVEL_PAGE,
             page: pageNum
-        }); 
-
-        aggregateData.sub.push(...((submissionData.submissions).map((submission) => [submission.UserID, submission.Enjoyment])));
+        }).then((submissionData) => {
+            const mappedSubmissions = submissionData.submissions.map((submission) => [submission.UserID, submission.Enjoyment]);
+            aggregateData.sub = aggregateData.sub.concat(mappedSubmissions);
+        })); 
     }
+
+    await Promise.allSettled(pageRequests);
 
     // finally get tags/skills
     const skillsData = await gddlAPI.getLevelSkills(levelID);
@@ -200,7 +207,7 @@ app.get('/api/user', async (req, res) => {
         let queryObject = {};
 
         if (req.query.userIDs != null) {
-            const ids = req.query.userIDs.split(",").map(id => parseInt(id));
+            const ids = req.query.userIDs.split(",").map(id => parseInt(id)).filter(id => !isNaN(id));
 
             queryObject = {userID: {$in: ids}};
         }
