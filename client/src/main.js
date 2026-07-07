@@ -66,15 +66,17 @@ async function addLevelCard(levelID, levelInfo) {
         skillCard.textContent = skillsString;
     });
 
-    levelName.textContent = levelInfo.levelName;
-    authorName.textContent = levelInfo.levelAuthor;
-    tier.textContent = Math.round(levelInfo.actualRating);
-    enj.textContent = Math.round(levelInfo.actualEnj);
+    dataCollection.requestLevelInfo(levelID).then(response => {
+        levelName.textContent = response.n;
+        authorName.textContent = response.a;
+        tier.textContent = Math.round(response.t);
+        enj.textContent = Math.round(response.e);
 
-    if (levelInfo.levelAuthor === "-") {
-        const author = levelCardFragment.querySelector(".author");
-        author.style.setProperty("display", "none");
-    }
+        if (authorName.textContent == null) {
+            const author = levelCardFragment.querySelector(".author");
+            author.style.setProperty("display", "none");
+        }
+    });
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");

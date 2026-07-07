@@ -4,13 +4,13 @@ const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
 
 // up to [this value] users will be put into the database
-export const MAX_OTHER_USERS_TO_TRACK = 800;
+export const MAX_OTHER_USERS_TO_TRACK = 39999;
 
 const BASE_COMPAT = 150;
 const ENJ_DIFFERENCE_FACTOR = 50;
 // multiplies the compat value if a certain number of levels are in common
 // this is to prevent people who have 1 level in common getting a very high compat
-const HIGH_NUM_COMMON_LEVELS_MULTIPLIER = 3.0;
+const HIGH_NUM_COMMON_LEVELS_MULTIPLIER = 2.8;
 const MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER = 5;
 const MAX_COMPAT = BASE_COMPAT * HIGH_NUM_COMMON_LEVELS_MULTIPLIER;
 
@@ -115,7 +115,16 @@ export class EnjoymentProfile {
         return this.ratingMap.get(levelID)?.enjoyment;
     }
 
-    addEnjRating(levelID, enjoyment, actualRating, actualEnj = -1, levelName = "Level", levelAuthor = "-") {
+    getLevelInfo(levelID) {
+        return {
+            actualRating: this.ratingMap.get(levelID)?.actualRating,
+            actualEnj: this.ratingMap.get(levelID)?.actualEnj,
+            levelName: this.ratingMap.get(levelID)?.levelName,
+            levelAuthor: this.ratingMap.get(levelID)?.levelAuthor
+        };
+    }
+
+    addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {
         if (enjoyment < 0 || enjoyment > 10) {
             return null;
         }
@@ -220,11 +229,12 @@ class DataManager {
         // just contains the compatibility values of all collected players, used to calculate compat threshold
         this.compatArr = [];
         /**
-         * contains all the levels to be considered in calculation, which are the main user's completed levels
-         * and the levels completed by the other users who are collected
+         * contains a cached mapping of levels to be considered in calculation (which are the main user's completed levels
+         * and the levels completed by the other users who are collected) to their levelInfo
+         * note that this cache does not contain ALL levels to be considered, only ones with cached levelInfo available
          * @type {Map<number, {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
          */
-        this.allRelevantLevelIDs = new Map();
+        this.cachedLevelInfo = new Map();
         /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
@@ -238,12 +248,12 @@ class DataManager {
      * @param {number} levelID 
      * @param {{actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}} levelInfo 
      */
-    addLevelInfo(levelID, levelInfo) {
-        if (this.allRelevantLevelIDs.has(levelID)) {
+    addLevelInfoToCache(levelID, levelInfo) {
+        if (this.cachedLevelInfo.has(levelID)) {
             return;
         }
 
-        this.allRelevantLevelIDs.set(levelID, levelInfo);
+        this.cachedLevelInfo.set(levelID, levelInfo);
         return levelInfo;
     }
 

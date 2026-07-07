@@ -77,3 +77,34 @@ export function getNSmallest(iterable, n, func = (a) => a) {
 export function reverseMap(map) {
     return new Map(Array.from(map, ([key, val]) => [val, key]));
 }
+
+/**
+ * 
+ * @param {Array} arr 
+ * @param {number} chunkSize 
+ * @returns 
+ */
+export function chunkArray(arr, chunkSize) {
+    const chunks = [];
+
+    for (let i = 0; i < arr.length; i += chunkSize) {
+        chunks.push(arr.slice(i, i + chunkSize));
+    }
+
+    return chunks;
+}
+
+/**
+ * measures the time elapsed of an awaited async function call
+ * @param {async} operation async function
+ * @param {Array} paramsArr array of parameters
+ * @param {string} name 
+ */
+export async function measureTime(operation, paramsArr, name = null) {
+    const timestamp = Date.now();
+    const operationResult = await operation(...paramsArr);
+    const timeElapsed = Date.now() - timestamp;
+
+    console.log(`time elapsed for ${(name == null) ? "operation" : name}: ${timeElapsed}ms`);
+    return operationResult;
+}
