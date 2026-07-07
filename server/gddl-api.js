@@ -143,7 +143,7 @@ export async function getAPIResponse(pathVariables, queryParams, retried = false
     trackers.numAPISuccesses++;
 
     if (delayedMs > 0) {
-        console.warn(`request to resultURL was delayed by ${delayedMs / 1000}s due to rate limits`);
+        console.warn(`request to ${resultURL} was delayed by ${delayedMs / 1000}s due to rate limits`);
     }
 
     return await response.json();
