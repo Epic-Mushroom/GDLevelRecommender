@@ -98,7 +98,7 @@ class APIError extends Error {
  * @param {Array<string>} pathVariables 
  * @param {Object} queryParams 
  */
-export async function getAPIResponse(pathVariables, queryParams, retried = false) {
+export async function getAPIResponse(pathVariables, queryParams, retried = false, delayedMs = 0) {
     let resultURL = GDDL_API_URL;
 
     for (const variable of pathVariables) {
@@ -118,9 +118,8 @@ export async function getAPIResponse(pathVariables, queryParams, retried = false
         trackers.numAPIErrors++;
 
         if (response.status === 429 /* && !retried */) {
-            console.log("rate limited... waiting 7000 ms to retry");
             await sleep(RATE_LIMIT_DELAY_MS);
-            return await getAPIResponse(pathVariables, queryParams, true);
+            return await getAPIResponse(pathVariables, queryParams, true, delayedMs + RATE_LIMIT_DELAY_MS);
         }
 
         if (contentType && contentType.includes("application/json")) {
@@ -133,6 +132,11 @@ export async function getAPIResponse(pathVariables, queryParams, retried = false
     }
 
     trackers.numAPISuccesses++;
+
+    if (delayedMs > 0) {
+        console.warn(`request to resultURL was delayed by ${delayedMs / 1000}s due to rate limits`);
+    }
+
     return await response.json();
 }
 
