@@ -1,5 +1,5 @@
 import * as dataCollection from "./data-collection.js";
-import {purifyInt, reverseMap, sleep} from "./utils.js";
+import {purifyInt, reverseMap, sleep} from "../../utils.js";
 
 const CLIENT_TICK_DELAY = 50; // milliseconds
 

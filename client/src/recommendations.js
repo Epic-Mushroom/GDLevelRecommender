@@ -1,4 +1,4 @@
-import {getRandomInt, getNSmallest} from "./utils.js";
+import {getRandomInt, getNSmallest, pearson} from "../../utils.js";
 
 const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
@@ -89,6 +89,8 @@ export class EnjoymentProfile {
         this.username = username;
         this.isOther = isOther;
 
+        this.avgEnjoyment = null;
+
         this.compat = (!isOther) ? BASE_COMPAT : null;
         this.compatThreshold = (!isOther) ? 100.0 : null;
 
@@ -122,6 +124,29 @@ export class EnjoymentProfile {
 
     getEnjoyment(levelID) {
         return this.ratingMap.get(levelID)?.enjoyment;
+    }
+
+    /**
+     * returns a modified enjoyment value with respect to the main user's avg enjoyment
+     * for example, if this user's avg enj is 8.0, and the main user's is 6.7, will subtract 1.3 from the rawEnj
+     * @param {number} rawEnj
+     * @param {EnjoymentProfile} mainUserProfile
+     */
+    getAdjustedEnjoyment(rawEnj, mainUserProfile) {
+        const mainUserAvgEnj = mainUserProfile.getAvgEnjoyment();
+        const thisUserAvgEnj = this.getAvgEnjoyment();
+        const difference = mainUserAvgEnj - thisUserAvgEnj;
+
+        return rawEnj + difference;
+    }
+
+    getAvgEnjoyment() {
+        if (this.avgEnjoyment == null) {
+            const allEnjoyments = Array.from(this.ratingMap.values()).map((val) => val.enjoyment).filter((enj) => enj != null);
+            this.avgEnjoyment = allEnjoyments.reduce((sum, val) => sum + val, 0) * 1.0 / allEnjoyments.length;
+        }
+
+        return this.avgEnjoyment;
     }
 
     getLevelInfo(levelID) {
@@ -168,9 +193,15 @@ export class EnjoymentProfile {
         let totalCompat = 0;
         let numCommonLevels = 0;
 
+        const thisUserEnjoymentArr = [];
+        const mainUserEnjoymentArr = [];
+
         for (const [levelID, ratingInfo] of this.ratingMap) {
             const enjoyment = ratingInfo.enjoyment;
             const mainUserEnjoyment = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
+
+            thisUserEnjoymentArr.push(enjoyment);
+            mainUserEnjoymentArr.push(mainUserEnjoyment);
 
             if (mainUserEnjoyment == null) {
                 continue;
@@ -186,6 +217,8 @@ export class EnjoymentProfile {
             // can't determine compat if there are no levels in common
             return null;
         }
+
+        const pearsonCoeff = pearson(thisUserEnjoymentArr, mainUserEnjoymentArr);
 
         this.compat = ((numCommonLevels >= MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER) ? HIGH_NUM_COMMON_LEVELS_MULTIPLIER : 1.0) * totalCompat / numCommonLevels;
         return this.compat;
@@ -331,13 +364,16 @@ class DataManager {
     }
 
     addWeight(levelID, weight, levelInfo) {
-        if (this.levelWeightsMap.get(levelID) == null) {
-            this.levelWeightsMap.set(levelID, {rawTotalWeight: weight, weight: weight / (STEP_3_WEIGHT_CONSTANT + 1), numRatings: 1, levelInfo: levelInfo});
+        const oldWeightData = this.levelWeightsMap.get(levelID);
+        let newWeight = weight / (1 + STEP_3_WEIGHT_CONSTANT);
+
+        if (oldWeightData == null) {
+            this.levelWeightsMap.set(levelID, {rawTotalWeight: weight, weight: newWeight, numRatings: 1, levelInfo: levelInfo});
 
         } else {
-            const oldRawTotalWeight = this.levelWeightsMap.get(levelID).rawTotalWeight;
-            const oldWeight = this.levelWeightsMap.get(levelID).weight;
-            const oldNumRatings = this.levelWeightsMap.get(levelID).numRatings;
+            const oldRawTotalWeight = oldWeightData.rawTotalWeight;
+            const oldWeight = oldWeightData.weight;
+            const oldNumRatings = oldWeightData.numRatings;
 
             const newRawTotalWeight = oldRawTotalWeight + weight;
             const newNumRatings = oldNumRatings + 1;
@@ -346,13 +382,13 @@ class DataManager {
             // const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
 
             // new calculation: should prevent both unpopularity and popularity bias
-            const newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
+            newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
 
             this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo})
 
         }
 
-        return weight;
+        return newWeight;
     }
 
     addAllWeights(minTier = 1, maxTier = 39) {
@@ -363,8 +399,9 @@ class DataManager {
                 }
 
                 const enjRating = ratingInfo.enjoyment;
+                const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
                 const actualRating = ratingInfo.actualRating;
-                const calculatedWeight = calculateWeight(enjRating, actualRating, minTier, maxTier, otherUserEnjProfile.compatThreshold);
+                const calculatedWeight = calculateWeight(adjustedEnjRating, actualRating, minTier, maxTier, otherUserEnjProfile.compatThreshold);
                 this.addWeight(levelID, calculatedWeight, ratingInfo);
             }
         }

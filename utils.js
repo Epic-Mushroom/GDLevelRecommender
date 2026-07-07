@@ -108,3 +108,39 @@ export async function measureTime(operation, paramsArr, name = null) {
     console.log(`time elapsed for ${(name == null) ? "operation" : name}: ${timeElapsed}ms`);
     return operationResult;
 }
+
+/**
+ * both arrays must have the same size
+ * @param {Array<number>} ratings1 
+ * @param {Array<number>} ratings2 
+ * @returns 
+ */
+export function pearson(ratings1, ratings2) {
+    const n = ratings1.length;
+    if (n < 2 || n !== ratings2.length) {
+        return 0; 
+    }
+
+    const avg1 = ratings1.reduce((sum, val) => sum + val, 0) / n;
+    const avg2 = ratings2.reduce((sum, val) => sum + val, 0) / n;
+
+    let numerator = 0;
+    let sumOfSquares1 = 0;
+    let sumOfSquares2 = 0;
+
+    for (let i = 0; i < n; i++) {
+        const difference1 = ratings1[i] - avg1;
+        const difference2 = ratings2[i] - avg2;
+
+        numerator += difference1 * difference2;
+        sumOfSquares1 += difference1 * difference1;
+        sumOfSquares2 += difference2 * difference2;
+    }
+
+    // need to check if any of the sums are 0, or else we would divide by 0
+    if (sumOfSquares1 === 0 || sumOfSquares2 === 0) {
+        return 0;
+    } 
+
+    return numerator * 1.0 / Math.sqrt(sumOfSquares1 * sumOfSquares2);
+}

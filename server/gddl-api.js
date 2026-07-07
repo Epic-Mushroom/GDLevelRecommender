@@ -1,4 +1,4 @@
-import {sleep, getNSmallest} from "./utils.js";
+import {sleep, getNSmallest} from "../utils.js";
 
 const GDDL_API_URL = "https://gdladder.com/api";
 

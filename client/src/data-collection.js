@@ -1,6 +1,6 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
-import {getNSmallest, sleep, chunkArray, measureTime} from "./utils.js";
+import {getNSmallest, sleep, chunkArray, measureTime} from "../../utils.js";
 
 const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";// db that contains only necessary data for this site
 const GDDL_API_URL = "https://gdladder.com/api";
@@ -44,10 +44,13 @@ export const DEFAULT_MAX_TIER = 39;
 
 const DEFAULT_MAIN_USER_SUBMISSIONS_SORT = "enjoyment";
 const DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
+// UNUSED:
 // at max how many of the main user's rated levels per enjoyment rating are sent an api request
 // for example if the user has 140 levels rated an 8/10, only [this value] 8/10 levels will be sent a request
 // this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
 const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
+// at max how many of the main user's rated levels in total are sent an api request
+const MAX_USER_LEVELS_TOTAL = 54;
 // at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
 // a globillion requests total and we don't want that 
 const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90; 
@@ -415,18 +418,24 @@ async function registerAllOtherUserCommonSubmissions() {
 
     const promiseArr = [];
 
-    for (const levelID of dataManager.mainUserEnjProfile.ratingMap.keys()) {
+    const filteredLevelIDs = getNSmallest(Array.from(dataManager.mainUserEnjProfile.ratingMap.keys()), MAX_USER_LEVELS_TOTAL, (levelID) => {
+        return -dataManager.mainUserEnjProfile.ratingMap.get(levelID).enjoyment;
+    });
+
+    for (const levelID of filteredLevelIDs) {
         let numSubmissionsThisLevelRegistered = 0;
 
         const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
 
-        if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-            console.log(`skipping getting other user submissions from level ID ${levelID}`);
-            if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-                console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
-            }
-            continue;
-        }
+        // old: uses MAX_USER_LEVELS_PER_ENJ_RATING to skip levels
+        // no longer needed since the ratingMap is now filtered anyway
+        // if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+        //     console.log(`skipping getting other user submissions from level ID ${levelID}`);
+        //     if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+        //         console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
+        //     }
+        //     continue;
+        // }
 
         // let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
 
