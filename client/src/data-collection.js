@@ -196,9 +196,23 @@ async function requestUsername(userID) {
     return (response.Name == null) ? null : response.Name;
 }
 
+/**
+ * 
+ * @param {number} userID 
+ * @returns {Array<{l: number, e: number}>}
+ */
+async function requestUserSubmissions(userID) {
+    const response = await getAPIResponse(["user", userID], {});
+    const ratingsArr = response.ratings;
+
+    return ratingsArr;
+}
+
 async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
+    let APIResponse = {};
+    
     if (includeTier) {
-        return await getAPIResponse(["user", userID, "submissions"], {
+        APIResponse = await getAPIResponse(["user", userID, "submissions"], {
             minTier: Math.max(Math.round(minTier), DEFAULT_MIN_TIER),
             maxTier: Math.min(Math.round(maxTier), DEFAULT_MAX_TIER),
             limit: NUM_SUBMISSIONS_PER_USER_PAGE,
@@ -210,7 +224,7 @@ async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sor
         }, true);
 
     } else {
-        return await getAPIResponse(["user", userID, "submissions"], {
+        APIResponse = await getAPIResponse(["user", userID, "submissions"], {
             limit: NUM_SUBMISSIONS_PER_USER_PAGE,
             page: pageNum,
             sort: sortMethod,
@@ -220,18 +234,8 @@ async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sor
         }, true);
 
     }
-}
 
-/**
- * 
- * @param {number} userID 
- * @returns {Array<{l: number, e: number}>}
- */
-async function requestUserSubmissions(userID) {
-    const response = await getAPIResponse(["user", userID], {});
-    const ratingsArr = response.ratings;
-
-    return ratingsArr;
+    return APIResponse;
 }
 
 export async function requestLevelInfo(levelID) {
@@ -405,6 +409,57 @@ async function registerUserSubmissions(
     });
 
     await Promise.allSettled(promiseArr);
+
+    console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
+}
+
+/**
+ * 
+ * @param {string} username 
+ */
+async function registerUserSubmissionsGDDL(
+    userID, username = null, isOther = false, minTier = DEFAULT_MIN_TIER, 
+    maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = DEFAULT_MAIN_USER_SUBMISSIONS_SORT,
+    sortDirection = DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION
+) {
+    if (username == null) {
+        const foundUsername = await requestUsername(userID);  
+        username = foundUsername;
+    }
+
+    console.log(`attempting to register submissions for ${username} using GDDL's api directly`);
+
+    let numSubmissionsRegistered = 0;
+
+    const registration = (response) => {
+        for (const submission of response.submissions) {
+            const argsData = [
+                submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
+                submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher?.name
+            ]
+
+            if (isOther) {
+                dataManager.addOtherUserEnjRating(userID, username, ...argsData);
+
+            } else {
+                dataManager.addMainUserEnjRating(...argsData);
+
+            }
+
+            numSubmissionsRegistered++;
+        }
+
+        // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
+    }
+
+    // find the max page first by making a request to the first page
+    const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
+    registration(response); // register first page of submissions
+    const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
+
+    for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
+        await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration);
+    }
 
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
@@ -590,8 +645,8 @@ async function registerAllOtherUserSubmissions(
 
         const sortDirection = "desc";
 
-        await registerUserSubmissions(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
-            maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection, skipAcquiringLevelInfo
+        await registerUserSubmissionsGDDL(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
+            maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection
         );
     }
 
