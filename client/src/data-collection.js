@@ -167,14 +167,14 @@ async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retri
  * 
  * @param {string} username 
  */
-async function requestUserID(username) {
+async function requestUserDetails(username) {
     const response = await getAPIResponse(["user", "search"], {limit: 1, name: username}, true);
 
     if (response.length === 0) {
         return null;
 
     } else {
-        return response[0].ID;
+        return [response[0].ID, response[0].Name];
     }
 }
 
@@ -182,10 +182,12 @@ async function requestUserID(username) {
  * 
  * @param {string} username 
  */
-async function requestUserProfile(userID) {
-    const response = await getAPIResponse(["user", userID], {});
+async function requestUsername(userID) {
+    // this will make a call to gddl because backend doesn't store usernames
+    // not yet at least
+    const response = await getAPIResponse(["user", userID], {}, true);
 
-    return response;
+    return (response.Name == null) ? null : response.Name;
 }
 
 async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
@@ -227,24 +229,37 @@ export async function requestLevelInfo(levelID) {
     return response;
 }
 
-async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
-    const response = await getAPIResponse(["level", levelID, "submissions"], {
-        sort: DEFAULT_SUBMISSIONS_SORT,
-        sortDirection: sortDirection,
-        twoPlayer: false,
-        progressFilter: "victors",
-        limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
-        page: pageNum
-    }, true);
+/**
+ * 
+ * @param {Array<number>} levelIDs 
+ * @returns 
+ */
+export async function requestLevelInfoBatch(levelIDs) {
+    const response = await getAPIResponse(["level"], {
+        levelIDs: levelIDs.join(",")
+    });
 
     return response;
 }
 
-async function requestLevelVictors(levelID) {
-    const response = await getAPIResponse(["level", levelID], {});
-    const victorUserIDs = response.sub;
+// async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
+//     const response = await getAPIResponse(["level", levelID, "submissions"], {
+//         sort: DEFAULT_SUBMISSIONS_SORT,
+//         sortDirection: sortDirection,
+//         twoPlayer: false,
+//         progressFilter: "victors",
+//         limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
+//         page: pageNum
+//     }, true);
 
-    return victorUserIDs;
+//     return response;
+// }
+
+async function requestLevelSubmissions(levelID) {
+    const response = await getAPIResponse(["level", levelID], {});
+    const submissions = response.sub;
+
+    return submissions;
 }
 
 async function requestLevelSkillsGDDL(levelID) {
@@ -317,46 +332,16 @@ async function registerUserSubmissions(
     sortDirection = DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION
 ) {
     if (username == null) {
-        const userProfile = await requestUserProfile(userID);  
-        username = userProfile.Name;
+        const foundUsername = await requestUsername(userID);  
+        username = foundUsername;
     }
 
     console.log(`attempting to register submissions for ${username}`);
 
     let numSubmissionsRegistered = 0;
 
-    // const registration = (response) => {
-    //     for (const submission of response.submissions) {
-    //         const argsData = [
-    //             submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-    //             submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher?.name
-    //         ]
-
-    //         if (isOther) {
-    //             dataManager.addOtherUserEnjRating(userID, username, ...argsData);
-
-    //         } else {
-    //             dataManager.addMainUserEnjRating(...argsData);
-
-    //         }
-
-    //         numSubmissionsRegistered++;
-    //     }
-
-    //     // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
-    // }
-
-    // // find the max page first by making a request to the first page
-    // const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
-    // registration(response); // register first page of submissions
-    // const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
-
-    // for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-    //     await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration);
-    // }
-
     const allRatings = await requestUserSubmissions(userID);
-    for (const rating of allRatings) {
+    const promiseArr = allRatings.map(async (rating) => {
         const levelInfoResponse = await requestLevelInfo(rating.l);
         const levelInfo = {
             actualRating: levelInfoResponse.t,
@@ -383,7 +368,9 @@ async function registerUserSubmissions(
 
         dataManager.addLevelInfo(rating.l, levelInfo);
         numSubmissionsRegistered++;
-    }
+    });
+
+    await Promise.allSettled(promiseArr);
 
     console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
 }
@@ -395,67 +382,93 @@ async function registerAllOtherUserCommonSubmissions() {
 
     console.log("attempting to register all other users' common submissions");
 
+    const promiseArr = [];
+
     for (const levelID of dataManager.mainUserEnjProfile.ratingMap.keys()) {
         let numSubmissionsThisLevelRegistered = 0;
 
-        try {
-            const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
+        const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
 
-            if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-                // console.log(`skipping getting other user submissions from level ID ${levelID}`);
-                // if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-                //     console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
-                // }
-                continue;
+        if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+            // console.log(`skipping getting other user submissions from level ID ${levelID}`);
+            // if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
+            //     console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
+            // }
+            continue;
+        }
+
+        // let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
+
+        // for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
+        //     const sortDirection = (mainUserEnjRating >= 6) ? "desc" : "asc";
+
+        //     await requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection).then((response) => {
+        //         for (const submission of response.submissions) {
+        //             if (submission.Enjoyment == null) {
+        //                 continue;
+        //             }
+
+        //             // this will NOT add level metadata (actual rating, actual enj, level name) since those
+        //             // values aren't present in the level/ID/submissions request for some reason
+        //             dataManager.addOtherUserEnjRating(
+        //                 submission.UserID, submission.User.Name, levelID, submission.Enjoyment
+        //             );
+        //             numSubmissionsThisLevelRegistered++;
+        //             numTotalSubmissionsRegistered++;
+        //         }
+        //     });
+            
+        // }
+
+        promiseArr.push(requestLevelInfo(levelID).then((levelInfoResponse) => {
+            const submissions2DArr = levelInfoResponse.sub;
+            const levelInfo = {
+                actualRating: levelInfoResponse.t,
+                actualEnj: levelInfoResponse.e,
+                levelName: levelInfoResponse.n,
+                levelAuthor: levelInfoResponse.a
+            };
+
+            for (const submissionArr of submissions2DArr) {
+                if (submissionArr[1] == null) {
+                    continue;
+                }
+
+                dataManager.addOtherUserEnjRating(
+                    submissionArr[0],
+                    null,
+                    levelID,
+                    submissionArr[1],
+                    levelInfo.actualRating,
+                    levelInfo.actualEnj,
+                    levelInfo.levelName,
+                    levelInfo.levelAuthor
+                );
+
+                numTotalSubmissionsRegistered++;
+                numSubmissionsThisLevelRegistered++;
             }
 
-            // let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
-
-            // for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
-            //     const sortDirection = (mainUserEnjRating >= 6) ? "desc" : "asc";
-
-            //     await requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection).then((response) => {
-            //         for (const submission of response.submissions) {
-            //             if (submission.Enjoyment == null) {
-            //                 continue;
-            //             }
-
-            //             // this will NOT add level metadata (actual rating, actual enj, level name) since those
-            //             // values aren't present in the level/ID/submissions request for some reason
-            //             dataManager.addOtherUserEnjRating(
-            //                 submission.UserID, submission.User.Name, levelID, submission.Enjoyment
-            //             );
-            //             numSubmissionsThisLevelRegistered++;
-            //             numTotalSubmissionsRegistered++;
-            //         }
-            //     });
-                
-            // }
-
-            requestLevelVictors(levelID).then((victorUserIDs) => {
-                // ...
-            });
-
-            levelsPerEnjoyment[mainUserEnjRating]++;
-
-        } catch (err) {
+        }).catch((err) => {
             if (err.name === "DataError") {
                 console.log(`hit ${recs.MAX_OTHER_USERS_TO_TRACK} users`);
-                continue;
             }
 
-            if (err.name !== "APIError") {
+            if (err.name !== "APIError" && err.name !== "DataError") {
                 throw err;
             }
 
             if (err.status === 429) {
                 // console.log(`halting gathering submissions from level ID ${levelID} due to rate limit`)
             }
+        }));
 
-        }
+        levelsPerEnjoyment[mainUserEnjRating]++;
 
         // console.log(`registered ${numSubmissionsThisLevelRegistered} submissions from level ID ${levelID}`);
     }
+
+    await Promise.allSettled(promiseArr);
 
     console.log(`registered ${numTotalSubmissionsRegistered} submissions from all other users`);
 }
@@ -494,26 +507,25 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 0: collect initial data
     let timestamp = Date.now();
-    const userID = await requestUserID(username);
+    const [userID, foundUsername] = await requestUserDetails(username);
 
     if (userID == null) {
         throw new Error("User not found! Make sure you have a GDDL account with that name");
     }
 
-    const userProfile = await requestUserProfile(userID);
-    if (userProfile.Name != username) {
+    if (foundUsername !== username) {
         console.warn("found user's name does not match input's username");
         // might want to display this to the user
     }
 
-    dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, userProfile.Name, false);
-    console.log(`set ${userProfile.Name}'s enj profile as the main enj profile`);
+    dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, foundUsername, false);
+    console.log(`set ${foundUsername}'s enj profile as the main enj profile`);
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 0 TIME ELAPSED: ${timeElapsedPerStage[0]}ms`);
 
     // stage 1: registering user submissions
     timestamp = Date.now();
-    await registerUserSubmissions(userID, userProfile.name, false); // intentionally leaving out min and max tier to get better user tastes
+    await registerUserSubmissions(userID, foundUsername, false); // intentionally leaving out min and max tier to get better user tastes
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 1 TIME ELAPSED: ${timeElapsedPerStage[1]}ms`);
 
