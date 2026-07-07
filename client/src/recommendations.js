@@ -14,23 +14,32 @@ const HIGH_NUM_COMMON_LEVELS_MULTIPLIER = 2.8;
 const MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER = 5;
 const MAX_COMPAT = BASE_COMPAT * HIGH_NUM_COMMON_LEVELS_MULTIPLIER;
 
-// ======================== OLD WEIGHT FORMULA IGNORE THIS ========================
-// step 1 weight calc formula: B + enjoyment * M
+// OLD step 1 weight calc formula: B + enjoyment * M
+//
+// NEW step 1 weight calc formula: (enjoyment^2 * A) + B2
+// so that high enjoyments (8-10) are weighted more heavily than 5 or 6
 const STEP_1_WEIGHT_CALC_B = -500;
 const STEP_1_WEIGHT_CALC_M = 100;
-// step 2 weight calc formula: (-1)^X * M * (N * compatThreshold)^P + B
+const STEP_1_WEIGHT_CALC_A = 5;
+const STEP_1_WEIGHT_CALC_B2 = -200;
+// OLD step 2 weight calc formula: (-1)^X * M * (N * compatThreshold)^P + B
 // X = 0 if step 1's weight > 0, X = 1 otherwise
-// add both steps
+// add step 2 to step 1
 // basically, 
 // if other user likes a level, and high compatibility, increase the weight
 // if other user doesn't like a level, and high compat, decrease the weight
 // if other user likes a level, and low compat, decrease the weight
-// if other user doesn't like a level, and low compat, increase the weight <=== THIS IS NOT A GOOD IDEA
+// if other user doesn't like a level, and low compat, increase the weight <=== THIS WAS NOT A GOOD IDEA
+//
+// NEW step 2 weight calc formula: (compatThreshold / 100)^P2
+// MULTIPLY step 2 with step 1
 const STEP_2_WEIGHT_CALC_M = 1.3;
 const STEP_2_WEIGHT_CALC_N = 1.5;
 const STEP_2_WEIGHT_CALC_P = 1.2;
 const STEP_2_WEIGHT_CALC_B = -260;
 const STEP_2_WEIGHT_CALC_P2 = 2.0;
+// for use in modified average weight
+const STEP_3_WEIGHT_CONSTANT = 2.0;
 
 /**
  * 
@@ -53,7 +62,7 @@ export function calculateWeight(enjoyment, rating, minTier, maxTier, compatThres
 
     // new formula
     let cumulativeResult = 0;
-    const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
+    const step1Result = STEP_1_WEIGHT_CALC_A * (enjoyment ** 2) + STEP_1_WEIGHT_CALC_B2;
     const compatMultiplier = (compatThreshold / 100.0) ** STEP_2_WEIGHT_CALC_P2;
     cumulativeResult += step1Result * compatMultiplier
 
@@ -238,7 +247,7 @@ class DataManager {
         /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
-         * @type {Map<number, {weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}}>}
+         * @type {Map<number, {rawTotalWeight: number, weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}}>}
          */
         this.levelWeightsMap = new Map();
     }
@@ -323,15 +332,23 @@ class DataManager {
 
     addWeight(levelID, weight, levelInfo) {
         if (this.levelWeightsMap.get(levelID) == null) {
-            this.levelWeightsMap.set(levelID, {weight: weight, numRatings: 1, levelInfo: levelInfo});
+            this.levelWeightsMap.set(levelID, {rawTotalWeight: weight, weight: weight / (STEP_3_WEIGHT_CONSTANT + 1), numRatings: 1, levelInfo: levelInfo});
 
         } else {
+            const oldRawTotalWeight = this.levelWeightsMap.get(levelID).rawTotalWeight;
             const oldWeight = this.levelWeightsMap.get(levelID).weight;
             const oldNumRatings = this.levelWeightsMap.get(levelID).numRatings;
 
-            // dampened sum to prevent unpopularity bias
-            const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(oldNumRatings + 1)));
-            this.levelWeightsMap.set(levelID, {weight: newWeight, numRatings: oldNumRatings + 1, levelInfo: levelInfo})
+            const newRawTotalWeight = oldRawTotalWeight + weight;
+            const newNumRatings = oldNumRatings + 1;
+
+            // old calculation: dampened sum to prevent unpopularity bias
+            // const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
+
+            // new calculation: should prevent both unpopularity and popularity bias
+            const newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
+
+            this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo})
 
         }
 
