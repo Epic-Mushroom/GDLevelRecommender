@@ -212,7 +212,7 @@ app.get('/api/user', async (req, res) => {
             queryObject = {userID: {$in: ids}};
         }
 
-        const users = await User.find(queryObject, '-_id');
+        const users = await User.find(queryObject, "-_id");
         res.json(users);
 
     } catch (err) {
@@ -231,7 +231,7 @@ app.get('/api/user/:userID', async (req, res) => {
             forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
         }
         
-        let user = await User.findOne({userID: id}, '-_id');
+        let user = await User.findOne({userID: id}, "-_id");
 
         if (user == null || forceUpdate) {
             user = await updateUserID(id);
@@ -248,14 +248,24 @@ app.get('/api/user/:userID', async (req, res) => {
 app.get('/api/level', async (req, res) => {
     try {
         let queryObject = {};
+        let ids = [];
 
         if (req.query.levelIDs != null) {
-            const ids = req.query.levelIDs.split(",").map(id => parseInt(id)).filter(id => !isNaN(id));
+            ids = req.query.levelIDs.split(",").map(id => parseInt(id)).filter(id => !isNaN(id));
             
             queryObject = {levelID: {$in: ids}};
         }
 
-        const levels = await Level.find(queryObject, '-sk -sub -_id');
+        for (const id of ids) {
+            let level = await Level.findOne({levelID: id}, "-_id");
+
+            if (level == null) {
+                console.log(`missing data for level ID ${id} in batch request, updating from gddl`);
+                level = await updateLevelID(id);
+            }
+        }
+
+        const levels = await Level.find(queryObject, "-sk -sub -_id");
         res.json(levels);
 
     } catch (err) {
@@ -275,7 +285,7 @@ app.get('/api/level/:levelID', async (req, res) => {
             forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
         }
 
-        let level = await Level.findOne({levelID: id}, '-_id');
+        let level = await Level.findOne({levelID: id}, "-_id");
 
         if (level == null || forceUpdate) {
             level = await updateLevelID(id);
