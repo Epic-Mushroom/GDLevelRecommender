@@ -144,3 +144,34 @@ export function pearson(ratings1, ratings2) {
 
     return numerator * 1.0 / Math.sqrt(sumOfSquares1 * sumOfSquares2);
 }
+
+/**
+ * 
+ * @param {[string, number][]} arr2D 
+ */
+export function normalize2DArr(arr2D, magnitude) {
+    const sumOfSquaredWeights = arr2D.reduce((sum, keyValPair) => sum + keyValPair[1] ** 2, 0);
+    const oldMagnitude = Math.sqrt(sumOfSquaredWeights);
+    const ratio = magnitude / oldMagnitude;
+
+    return arr2D.map(([key, val]) => [key, val * ratio]);
+}
+
+/**
+ * adjusts a value that is within oldRange so that it fits the same way in newRange
+ * for example, adjusting the value 5 from oldRange [0, 10] to newRange [1, 2] will return 1.5
+ * @param {number} value 
+ * @param {Array<number>} oldRange 
+ * @param {Array<number>} newRange 
+ */
+export function adjustToRange(value, oldRange, newRange) {
+    if (oldRange.length !== 2 || newRange.length !== 2) {
+        throw new Error("ranges must have length 2");
+    }
+
+    const oldRangeLength = oldRange[1] - oldRange[0];
+    const newRangeLength = newRange[1] - newRange[0];
+
+    const rangeProportion = (value - oldRange[0]) * 1.0 / oldRangeLength;
+    return newRange[0] + rangeProportion * newRangeLength;
+}

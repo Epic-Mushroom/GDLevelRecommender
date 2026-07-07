@@ -1,6 +1,6 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
-import {getNSmallest, sleep, chunkArray, measureTime} from "../../utils.js";
+import {getNSmallest, sleep, chunkArray, measureTime, normalize2DArr} from "../../utils.js";
 
 const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";// db that contains only necessary data for this site
 const GDDL_API_URL = "https://gdladder.com/api";
@@ -35,6 +35,7 @@ export const SKILLS_MAPPING = new Map([
     ["Slow-Paced", "19"],
     [null, "0"]
 ]);
+export const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 
 const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
 const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
@@ -58,7 +59,7 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 20;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 14;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
@@ -209,10 +210,8 @@ async function requestUserSubmissions(userID) {
 }
 
 async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
-    let APIResponse = {};
-    
     if (includeTier) {
-        APIResponse = await getAPIResponse(["user", userID, "submissions"], {
+        return await getAPIResponse(["user", userID, "submissions"], {
             minTier: Math.max(Math.round(minTier), DEFAULT_MIN_TIER),
             maxTier: Math.min(Math.round(maxTier), DEFAULT_MAX_TIER),
             limit: NUM_SUBMISSIONS_PER_USER_PAGE,
@@ -224,7 +223,7 @@ async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sor
         }, true);
 
     } else {
-        APIResponse = await getAPIResponse(["user", userID, "submissions"], {
+        return await getAPIResponse(["user", userID, "submissions"], {
             limit: NUM_SUBMISSIONS_PER_USER_PAGE,
             page: pageNum,
             sort: sortMethod,
@@ -234,8 +233,6 @@ async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sor
         }, true);
 
     }
-
-    return APIResponse;
 }
 
 export async function requestLevelInfo(levelID) {
@@ -281,6 +278,32 @@ async function requestLevelSubmissions(levelID) {
     return submissions;
 }
 
+async function requestUserSkillsGDDL(userID) {
+    const response = await getAPIResponse(["user", userID, "skills"], {
+        tierCorrection: "true",
+        adjustRarity: "true"
+    }, true);
+
+    return response;
+}
+
+export async function getUserSkillsGDDL(userID) {
+    try {
+        const response = await requestUserSkillsGDDL(userID);
+
+        return Object.entries(response);
+
+    } catch (err) {
+        if (err.name === "APIError" && err.status === 429) {
+            return [];
+
+        } else {
+            throw err;
+
+        }
+    }
+}
+
 async function requestLevelSkillsGDDL(levelID) {
     const response = await getAPIResponse(["level", levelID, "tags"], {}, true);
 
@@ -299,7 +322,7 @@ export async function getLevelSkillsGDDL(levelID, limit = null) {
         }
 
         if (limit == null) {
-            return skillsMap;
+            return Array.from(skillsMap);
         } else {
             return getNSmallest(skillsMap, limit, ([key, val]) => -val);
         }
@@ -325,7 +348,7 @@ export async function getLevelSkills(levelID, limit = null) {
         }
 
         if (limit == null) {
-            return skillsMap;
+            return Array.from(skillsMap);
         } else {
             return getNSmallest(skillsMap, limit, ([key, val]) => -val);
         }
@@ -580,8 +603,6 @@ async function registerAllOtherUserCommonSubmissions() {
 async function registerAllRelevantLevelInfo(minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, enjProfileArr) {
     const megaLevelIDsBatchSet = new Set();
 
-    // since enjProfileArr is passed in as only the most compatible users, awaiting requestUserSubmissions per user
-    // theoretically shouldn't take forever
     for (const enjProfile of enjProfileArr) {
         const ratingsArr = await measureTime(
             requestUserSubmissions, [enjProfile.userID], 
@@ -632,10 +653,10 @@ async function registerAllOtherUserSubmissions(
     skipAcquiringLevelInfo = true
 ) {
     // this method won't work unless you've already pre-calculated compats and thresholds before
-    const otherUsersArr = [];
-    otherUsersArr.push(...dataManager.getMostCompatiblePlayers(usersLimit));
+    const otherUsersArr = dataManager.getMostCompatiblePlayers(usersLimit);
 
-    // await registerAllRelevantLevelInfo(minTier, maxTier, otherUsersArr);
+    // REMOVE THIS ASAP
+    registerAllRelevantLevelInfo(minTier, maxTier, dataManager.getMostCommonPlayers(20));
 
     // use this method if calculating compats and thresholds is to be done later
     // const otherUsersArr = dataManager.getMostCommonPlayers(usersLimit);
@@ -666,11 +687,11 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 0: collect initial data
     let timestamp = Date.now();
-    const [userID, foundUsername] = await requestUserDetails(username);
-
-    if (userID == null) {
+    const userDetails = await requestUserDetails(username);
+    if (userDetails == null) {
         throw new Error("User not found! Make sure you have a GDDL account with that name");
     }
+    const [userID, foundUsername] = userDetails;
 
     if (foundUsername !== username) {
         console.warn("found user's name does not match input's username");

@@ -51,9 +51,12 @@ async function addLevelCard(levelID, levelInfo) {
     const levelCard = levelCardFragment.querySelector(".level-card");
     const skillCard = levelCardFragment.querySelector(".skills-display");
     const levelName = levelCardFragment.querySelector(".level-name");
+    const levelIDText = levelCardFragment.querySelector(".level-id");
     const authorName = levelCardFragment.querySelector(".author-name");
     const tier = levelCardFragment.querySelector(".tier");
     const enj = levelCardFragment.querySelector(".enjoyment");
+
+    levelIDText.textContent = levelID;
 
     dataCollection.getLevelSkills(levelID, 3).then(arr => {
         const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
@@ -150,7 +153,6 @@ form.addEventListener("submit", async (event) => {
 
     } catch (err) {
         errorMsg(err.message);
-        throw err; // DEBUG ONLY
     }
 });
 
