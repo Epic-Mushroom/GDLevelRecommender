@@ -255,7 +255,7 @@ app.get('/api/level', async (req, res) => {
             queryObject = {levelID: {$in: ids}};
         }
 
-        const levels = await Level.find(queryObject, '-_id');
+        const levels = await Level.find(queryObject, '-sk -sub -_id');
         res.json(levels);
 
     } catch (err) {
