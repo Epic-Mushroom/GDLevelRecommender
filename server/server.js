@@ -120,9 +120,6 @@ async function updateLevelID(levelID) {
         sub: [] // submitters' userIDs and corresp. enj ratings in a 2d array
     };
 
-    // first call level/{levelID} to get Meta.Name (n), EnjoymentCount (ec), 
-    // Meta.Publisher?.name (a), Rating (t) (ROUND THIS to 2dp), 
-    // Enjoyment (e) (ALSO ROUND THIS TO 2dp)
     const levelBaseData = await getGDDLResponse(["level", levelID], {}); 
     aggregateData.levelID = levelID;
     aggregateData.n = levelBaseData.Meta.Name;
@@ -150,7 +147,7 @@ async function updateLevelID(levelID) {
             page: pageNum
         }).then((submissionData) => {
             const mappedSubmissions = submissionData.submissions.map((submission) => [submission.UserID, submission.Enjoyment]);
-            aggregateData.push(...mappedSubmissions);
+            aggregateData.sub.push(...mappedSubmissions);
         })); 
     }
 
