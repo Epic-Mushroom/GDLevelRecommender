@@ -148,7 +148,7 @@ async function updateLevelID(levelID) {
             page: pageNum
         }).then((submissionData) => {
             const mappedSubmissions = submissionData.submissions.map((submission) => [submission.UserID, submission.Enjoyment]);
-            aggregateData.sub = aggregateData.sub.concat(mappedSubmissions);
+            aggregateData.push(...mappedSubmissions);
         })); 
     }
 
@@ -243,6 +243,26 @@ app.get('/api/user/:userID', async (req, res) => {
         const errorDetails = getErrorDetails(err);
 
         res.status(errorDetails.status).json({error: errorDetails.message});
+    }
+});
+app.get('/api/level', async (req, res) => {
+    try {
+        let queryObject = {};
+
+        if (req.query.levelIDs != null) {
+            const ids = req.query.levelIDs.split(",").map(id => parseInt(id)).filter(id => !isNaN(id));
+            
+            queryObject = {levelID: {$in: ids}};
+        }
+
+        const levels = await Level.find(queryObject, '-_id');
+        res.json(levels);
+
+    } catch (err) {
+        const errorDetails = getErrorDetails(err);
+
+        res.status(errorDetails.status).json({error: errorDetails.message});
+
     }
 });
 app.get('/api/level/:levelID', async (req, res) => {
