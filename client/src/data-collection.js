@@ -1,13 +1,18 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
-import {getNSmallest, sleep, chunkArray, measureTime, normalize2DArr} from "../../utils.js";
+import {getRandomInt, getNSmallest, sleep, chunkArray, measureTime, normalize2DArr} from "../../utils.js";
 
 const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";// db that contains only necessary data for this site
 const GDDL_API_URL = "https://gdladder.com/api";
 const BACKEND_REDIRECT_URL = "/api"; // redirects to backend
 const GDDL_REDIRECT_URL = "/gddlapi"; // redirects to gddl api
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
-const BACKEND_PROXY_URL = `/api/gddlproxy`;
+const BACKEND_PROXY_URL = `/api/gddlproxy`; // redirects to proxy of gddl api hosted on backend
+const PROXIES = [
+    GDDL_REDIRECT_URL, // directly access gddl from backend
+    BACKEND_PROXY_URL
+]
+const getRandomProxy = () => PROXIES[getRandomInt(0, PROXIES.length - 1)];
 
 const RATE_LIMIT_DELAY_MS = 250;
 
@@ -60,7 +65,7 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 14;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 17;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
@@ -134,7 +139,7 @@ class APIError extends Error {
  * @param {Object} queryParams 
  */
 async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retried = false) {
-    let resultURL = (useGDDL) ? BACKEND_PROXY_URL : BACKEND_REDIRECT_URL;
+    let resultURL = (useGDDL) ? GDDL_REDIRECT_URL : BACKEND_REDIRECT_URL;
 
     for (const variable of pathVariables) {
         resultURL += `/${encodeURIComponent(variable)}`;
@@ -248,15 +253,26 @@ export async function requestLevelInfo(levelID) {
  * @returns 
  */
 export async function requestLevelInfoBatch(levelIDs) {
-    const response = await getAPIResponse(["level"], {
-        levelIDs: levelIDs.join(",")
-    });
+    const chunkedArr = chunkArray(levelIDs, MAX_LEVEL_ID_BATCH_SIZE);
+    const responseArr = [];
 
-    if (levelIDs.length !== response.length) {
-        console.warn(`response length differs from input length by ${levelIDs.length - response.length}`);
+    const promiseArr = [];
+    for (const chunk of chunkedArr) {
+        promiseArr.push(getAPIResponse(["level"], {
+            levelIDs: chunk.join(",")
+        }).then((response) => {
+            if (chunk.length !== response.length) {
+                console.warn(`response length differs from input length by ${chunk.length - response.length}`);
+            }
+
+            if (response != null) {
+                responseArr.push(...response);
+            }
+        }));
     }
 
-    return response;
+    await Promise.allSettled(promiseArr);
+    return responseArr;
 }
 
 // async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
@@ -288,6 +304,11 @@ async function requestUserSkillsGDDL(userID) {
     return response;
 }
 
+/**
+ * reformats the GDDL API response into a 2D array
+ * @param {number} userID 
+ * @returns 
+ */
 export async function getUserSkillsGDDL(userID) {
     try {
         const response = await requestUserSkillsGDDL(userID);
@@ -311,7 +332,10 @@ async function requestLevelSkillsGDDL(levelID) {
     return response;
 }
 
-// reformats the GDDL API response into something more usable
+/**
+ * reformats the GDDL API response into a 2D array
+ * @param {number} levelID
+ */
 export async function getLevelSkillsGDDL(levelID, limit = null) {
     try {
         const tags = await requestLevelSkillsGDDL(levelID);
@@ -624,26 +648,20 @@ async function registerAllRelevantLevelInfo(minTier = DEFAULT_MIN_TIER, maxTier 
     }
 
     const megaLevelIDsBatchArr = Array.from(megaLevelIDsBatchSet);
-    const chunkedBatch = chunkArray(megaLevelIDsBatchArr, MAX_LEVEL_ID_BATCH_SIZE);
+    console.log(`awaiting registration of ${megaLevelIDsBatchArr.length} levels`);
 
-    const promiseArr = [];
-    for (const chunk of chunkedBatch) {
-        promiseArr.push(requestLevelInfoBatch(chunk).then((response) => {
-            for (const levelData of response) {
-                dataManager.addLevelInfoToCache(levelData.levelID, {
-                    actualRating: levelData.t,
-                    actualEnj: levelData.e,
-                    levelName: levelData.n,
-                    levelAuthor: levelData.a
-                });
+    const response = await requestLevelInfoBatch(megaLevelIDsBatchArr);
 
-            }
-        }));
+    for (const levelData of response) {
+        dataManager.addLevelInfoToCache(levelData.levelID, {
+            actualRating: levelData.t,
+            actualEnj: levelData.e,
+            levelName: levelData.n,
+            levelAuthor: levelData.a
+        });
 
     }
 
-    console.log(`awaiting registration of ${megaLevelIDsBatchArr.length} levels (${chunkedBatch.length} chunks)`);
-    await Promise.allSettled(promiseArr);
     console.log(`registered all contender levels`);
 
 }
@@ -655,9 +673,6 @@ async function registerAllOtherUserSubmissions(
 ) {
     // this method won't work unless you've already pre-calculated compats and thresholds before
     const otherUsersArr = dataManager.getMostCompatiblePlayers(usersLimit);
-
-    // REMOVE THIS ASAP
-    registerAllRelevantLevelInfo(minTier, maxTier, dataManager.getMostCommonPlayers(20));
 
     // use this method if calculating compats and thresholds is to be done later
     // const otherUsersArr = dataManager.getMostCommonPlayers(usersLimit);
@@ -722,6 +737,10 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log("calculated compatibilities and thresholds");
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 3 TIME ELAPSED: ${timeElapsedPerStage[3]}ms`);
+
+    // this effectively uses the browser to crawl the database adding to backend in the background
+    // and this should really not be left in on release
+    // registerAllRelevantLevelInfo(minTier, maxTier, dataManager.getMostCommonPlayers(20));
 
     // stage 4: registering the submissions of the collected users
     timestamp = Date.now();

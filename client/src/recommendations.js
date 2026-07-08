@@ -259,6 +259,14 @@ export class EnjoymentProfile {
 class DataManager {
     constructor() {
         this.reset();
+
+        /**
+         * contains a cached mapping of levels to be considered in calculation (which are the main user's completed levels
+         * and the levels completed by the other users who are collected) to their levelInfo
+         * note that this cache does not contain ALL levels to be considered, only ones with cached levelInfo available
+         * @type {Map<number, {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
+         */
+        this.cachedLevelInfo = new Map();
     }
 
     reset() {
@@ -271,18 +279,13 @@ class DataManager {
         // just contains the compatibility values of all collected players, used to calculate compat threshold
         this.compatArr = [];
         /**
-         * contains a cached mapping of levels to be considered in calculation (which are the main user's completed levels
-         * and the levels completed by the other users who are collected) to their levelInfo
-         * note that this cache does not contain ALL levels to be considered, only ones with cached levelInfo available
-         * @type {Map<number, {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
-         */
-        this.cachedLevelInfo = new Map();
-        /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
          * @type {Map<number, {rawTotalWeight: number, weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}}>}
          */
         this.levelWeightsMap = new Map();
+
+        // do NOT clear the level info cache on a reset
     }
 
     /**
