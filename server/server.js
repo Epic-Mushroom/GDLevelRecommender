@@ -37,7 +37,7 @@ const LevelSchema = new Schema({
     sk: [SkillSchema], // list of skills
     sub: [[Number]] // 2d list of submitters' userIDs and corresp. enj ratings
 });
-const Level = model("Level", LevelSchema);
+export const Level = model("Level", LevelSchema);
 
 class GDDLError extends Error {
     constructor(status, message) {
@@ -63,6 +63,7 @@ async function getGDDLResponse(pathVariables, queryParams) {
 
 async function updateUserID(userID) {
     const ratings = [];
+    let rateLimitCounter = 0;
 
     const collection = (response) => {
         for (const submission of response.submissions) {
@@ -71,6 +72,10 @@ async function updateUserID(userID) {
                 e: submission.Enjoyment,
                 at: Math.round(submission.Level.Rating * 100.0) / 100
             });
+        }
+
+        if (response._rateLimitCounter != null) {
+            rateLimitCounter += response._rateLimitCounter;
         }
 
         // console.log(`${ratings.length} submissions collected for id ${userID} so far`);
@@ -105,10 +110,10 @@ async function updateUserID(userID) {
     );
 
     console.log(`saved user ID ${userID} to db with ${ratings.length} ratings`);
-    return {userID: userID, ratings: ratings};
+    return {userID: userID, ratings: ratings, rateLimitCounter: rateLimitCounter};
 }
 
-async function updateLevelID(levelID) {
+export async function updateLevelID(levelID, baseData = null) {
     const aggregateData = {
         levelID: 1,
         n: "Level", // level name
@@ -120,13 +125,25 @@ async function updateLevelID(levelID) {
         sub: [] // submitters' userIDs and corresp. enj ratings in a 2d array
     };
 
-    const levelBaseData = await getGDDLResponse(["level", levelID], {}); 
-    aggregateData.levelID = levelID;
-    aggregateData.n = levelBaseData.Meta.Name;
-    aggregateData.ec = levelBaseData.EnjoymentCount;
-    aggregateData.a = levelBaseData.Meta.Publisher?.name;
-    aggregateData.t = Math.round(levelBaseData.Rating * 100) / 100;
-    aggregateData.e = Math.round(levelBaseData.Enjoyment * 100) / 100;
+    if (baseData == null) {
+        const levelBaseData = await getGDDLResponse(["level", levelID], {}); 
+        aggregateData.levelID = levelID;
+        aggregateData.n = levelBaseData.Meta.Name;
+        aggregateData.ec = levelBaseData.EnjoymentCount;
+        aggregateData.a = levelBaseData.Meta.Publisher?.name;
+        aggregateData.t = Math.round(levelBaseData.Rating * 100) / 100;
+        aggregateData.e = Math.round(levelBaseData.Enjoyment * 100) / 100;
+
+    } else {
+        for (const [key, val] of Object.entries(baseData)) {
+            if (key === "t" || key === "e") {
+                aggregateData[key] = Math.round(val * 100) / 100;
+                continue;
+            }
+
+            aggregateData[key] = val;
+        }
+    }
 
     // then call level/{levelID}/submissions and COLLECT ONLY THE USERS IDS of the submitters
     const maxPageNum = Math.ceil(aggregateData.ec * 1.0 / gddlAPI.NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
@@ -206,7 +223,7 @@ app.get("/api/gddlproxy/*splat", async (req, res) => {
         const pathArr = req.params.splat.filter((elem) => elem !== "");
         const queryParams = req.query;
 
-        res.json(await gddlAPI.getAPIResponse(pathArr, queryParams));
+        res.json(await getGDDLResponse(pathArr, queryParams));
 
     } catch (err) {
         console.error("failed making request to gddl as proxy");

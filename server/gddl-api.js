@@ -9,7 +9,7 @@ const PROXIES = [
 
 const getRandomProxy = () => PROXIES[getRandomInt(0, PROXIES.length - 1)];
 
-const RATE_LIMIT_DELAY_MS = 7000;
+const RATE_LIMIT_DELAY_MS = 5000;
 
 export const SKILLS_MAPPING = new Map([
     ["Cube", "1"],
@@ -57,7 +57,7 @@ export const flags = {
 
 class Semaphore {
     // max how many api calls to make concurrently
-    static MAX_BATCH_REQUEST_SIZE = 7;
+    static MAX_BATCH_REQUEST_SIZE = 34;
 
     constructor() {
         this.numActiveRequests = 0;
@@ -148,81 +148,13 @@ export async function getAPIResponse(pathVariables, queryParams, retried = false
 
     trackers.numAPISuccesses++;
 
+    const responseJson = await response.json();
     if (delayedMs > 0) {
         console.warn(`request to ${resultURL} was delayed by ${delayedMs / 1000}s due to rate limits`);
+        responseJson._rateLimitCounter = delayedMs / RATE_LIMIT_DELAY_MS;
     }
 
-    return await response.json();
-}
-
-/**
- * 
- * @param {string} username 
- */
-export async function requestUserID(username) {
-    const response = await getAPIResponse(["user", "search"], {limit: 1, name: username});
-
-    if (response.length === 0) {
-        return null;
-
-    } else {
-        return response[0].ID;
-    }
-}
-
-/**
- * 
- * @param {string} username 
- */
-export async function requestUserProfile(userID) {
-    const response = await getAPIResponse(["user", userID], {});
-
-    return response;
-}
-
-export async function requestUserSubmissions(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, includeTier = true) {
-    if (includeTier) {
-        return await getAPIResponse(["user", userID, "submissions"], {
-            minTier: Math.max(Math.round(minTier), DEFAULT_MIN_TIER),
-            maxTier: Math.min(Math.round(maxTier), DEFAULT_MAX_TIER),
-            limit: NUM_SUBMISSIONS_PER_USER_PAGE,
-            page: pageNum,
-            sort: sortMethod,
-            sortDirection: sortDirection,
-            onlyIncomplete: false,
-            pending: false
-        });
-
-    } else {
-        return await getAPIResponse(["user", userID, "submissions"], {
-            limit: NUM_SUBMISSIONS_PER_USER_PAGE,
-            page: pageNum,
-            sort: sortMethod,
-            sortDirection: sortDirection,
-            onlyIncomplete: false,
-            pending: false
-        });
-
-    }
-}
-
-export async function requestLevelInfo(levelID) {
-    const response = await getAPIResponse(["level", levelID], {});
-
-    return response;
-}
-
-export async function requestLevelSubmissions(levelID, pageNum, sortDirection) {
-    const response = await getAPIResponse(["level", levelID, "submissions"], {
-        sort: DEFAULT_SUBMISSIONS_SORT,
-        sortDirection: sortDirection,
-        twoPlayer: false,
-        progressFilter: "victors",
-        limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
-        page: pageNum
-    });
-
-    return response;
+    return responseJson;
 }
 
 export async function requestLevelSkills(levelID) {

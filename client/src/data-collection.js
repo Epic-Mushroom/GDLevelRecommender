@@ -90,7 +90,7 @@ export const flags = {
 
 class Semaphore {
     // max how many api calls to make concurrently
-    static MAX_BATCH_REQUEST_SIZE = 7;
+    static MAX_BATCH_REQUEST_SIZE = 20;
 
     constructor() {
         this.numActiveRequests = 0;
@@ -468,7 +468,7 @@ async function registerUserSubmissions(
 async function registerUserSubmissionsGDDL(
     userID, username = null, isOther = false, minTier = DEFAULT_MIN_TIER, 
     maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = DEFAULT_MAIN_USER_SUBMISSIONS_SORT,
-    sortDirection = DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION
+    sortDirection = DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION, registerSkills = true
 ) {
     if (username == null) {
         const foundUsername = await requestUsername(userID);  
