@@ -405,12 +405,12 @@ async function registerUserSubmissions(
     maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = DEFAULT_MAIN_USER_SUBMISSIONS_SORT,
     sortDirection = DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION, skipAcquiringLevelInfo = true
 ) {
-    if (username == null) {
+    if (username == null && !isOther /* for now, this should only trigger for main user */) {
         const foundUsername = await requestUsername(userID);  
         username = foundUsername;
     }
 
-    console.log(`attempting to register submissions for ${username}`);
+    console.log(`attempting to register submissions for ${username}(${userID})`);
 
     let numSubmissionsRegistered = 0;
 
@@ -476,12 +476,12 @@ async function registerUserSubmissionsGDDL(
 ) {
     // not really needed for other users
     // maybe for potential future "neighbors" feature
-    if (username == null) {
+    if (username == null && !isOther /* for now, this should only trigger for main user */) {
         const foundUsername = await requestUsername(userID);  
         username = foundUsername;
     }
 
-    console.log(`attempting to register submissions for ${username} using GDDL's api directly`);
+    console.log(`attempting to register submissions for ${username}(${userID}) using GDDL's api directly`);
 
     let numSubmissionsRegistered = 0;
 
@@ -521,16 +521,23 @@ async function registerUserSubmissionsGDDL(
         // console.log(`${numSubmissionsRegistered} submissions registered for ${username} so far`);
     }
 
+    const registerPage = async (userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther) => {
+        const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther);
+        await registration(response);
+    }
+
     // find the max page first by making a request to the first page
     const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
     await registration(response); // register first page of submissions
     const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
 
     // add concurrency here!!!!!!!!
+    const promiseArr = [];
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-        const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther);
-        await registration(response);
+        promiseArr.push(registerPage(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther));
     }
+
+    await Promise.allSettled(promiseArr);
 
     console.log(`submission registration for ${username} finished using GDDL api: ${numSubmissionsRegistered} submissions registered`);
 }
@@ -544,6 +551,7 @@ async function registerAllOtherUserCommonSubmissions() {
 
     const promiseArr = [];
 
+    // top MAX_USER_LEVELS_TOTAL levels from the main user sorted by their enjoyment
     const filteredLevelIDs = getNSmallest(Array.from(dataManager.mainUserEnjProfile.ratingMap.keys()), MAX_USER_LEVELS_TOTAL, (levelID) => {
         return -dataManager.mainUserEnjProfile.ratingMap.get(levelID).enjoyment;
     });
@@ -552,39 +560,6 @@ async function registerAllOtherUserCommonSubmissions() {
         let numSubmissionsThisLevelRegistered = 0;
 
         const mainUserEnjRating = dataManager.mainUserEnjProfile.getEnjoyment(levelID);
-
-        // old: uses MAX_USER_LEVELS_PER_ENJ_RATING to skip levels
-        // no longer needed since the ratingMap is now filtered anyway
-        // if (mainUserEnjRating == null || levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-        //     console.log(`skipping getting other user submissions from level ID ${levelID}`);
-        //     if (levelsPerEnjoyment[mainUserEnjRating] >= MAX_USER_LEVELS_PER_ENJ_RATING) {
-        //         console.log(`   because of passing threshold for enj rating ${mainUserEnjRating}`);
-        //     }
-        //     continue;
-        // }
-
-        // let maxPageNum = Math.ceil(MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL * 1.0 / NUM_SUBMISSIONS_PER_LEVEL_PAGE) - 1;
-
-        // for (let pageNum = 0; pageNum <= maxPageNum ; pageNum++) {
-        //     const sortDirection = (mainUserEnjRating >= 6) ? "desc" : "asc";
-
-        //     await requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection).then((response) => {
-        //         for (const submission of response.submissions) {
-        //             if (submission.Enjoyment == null) {
-        //                 continue;
-        //             }
-
-        //             // this will NOT add level metadata (actual rating, actual enj, level name) since those
-        //             // values aren't present in the level/ID/submissions request for some reason
-        //             dataManager.addOtherUserEnjRating(
-        //                 submission.UserID, submission.User.Name, levelID, submission.Enjoyment
-        //             );
-        //             numSubmissionsThisLevelRegistered++;
-        //             numTotalSubmissionsRegistered++;
-        //         }
-        //     });
-            
-        // }
 
         promiseArr.push(requestLevelInfo(levelID).then((levelInfoResponse) => {
             const submissions2DArr = levelInfoResponse.sub;
@@ -699,15 +674,19 @@ async function registerAllOtherUserSubmissions(
     // use this method if calculating compats and thresholds is to be done later
     // const otherUsersArr = dataManager.getMostCommonPlayers(usersLimit);
 
+    const promiseArr = [];
     for (const otherUserEnjProfile of otherUsersArr) {
         // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
 
         const sortDirection = "desc";
 
-        await registerUserSubmissionsGDDL(otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
+        promiseArr.push(registerUserSubmissionsGDDL(
+            otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
             maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection
-        );
+        ));
     }
+
+    await Promise.allSettled(promiseArr);
 
 }
 

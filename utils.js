@@ -146,8 +146,8 @@ export function pearson(ratings1, ratings2) {
 }
 
 /**
- * 
- * @param {[string, number][]} arr2D 
+ * does not mutate the original array
+ * @param {[*, number][]} arr2D 
  */
 export function normalize2DArr(arr2D, magnitude) {
     const sumOfSquaredWeights = arr2D.reduce((sum, keyValPair) => sum + keyValPair[1] ** 2, 0);
@@ -155,6 +155,18 @@ export function normalize2DArr(arr2D, magnitude) {
     const ratio = magnitude / oldMagnitude;
 
     return arr2D.map(([key, val]) => [key, val * ratio]);
+}
+
+/**
+ * "inverts" a 2D array as a vector, where relatively high values will become relatively low ones and vice versa
+ * does not mutate the original array
+ * @param {[*, number][]} arr2D 
+ */
+export function invert2DArr(arr2D) {
+    const rangeEnd = Math.max(...arr2D.map(keyValPair => keyValPair[1]));
+    const rangeStart = Math.min(...arr2D.map(keyValPair => keyValPair[1]));
+
+    return arr2D.map(([key, val]) => [key, rangeEnd + rangeStart - val]);
 }
 
 /**
@@ -172,6 +184,6 @@ export function adjustToRange(value, oldRange, newRange) {
     const oldRangeLength = oldRange[1] - oldRange[0];
     const newRangeLength = newRange[1] - newRange[0];
 
-    const rangeProportion = (value - oldRange[0]) * 1.0 / oldRangeLength;
+    const rangeProportion = (oldRangeLength === 0) ? 0 : ((value - oldRange[0]) * 1.0 / oldRangeLength);
     return newRange[0] + rangeProportion * newRangeLength;
 }

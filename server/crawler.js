@@ -10,10 +10,8 @@ async function crawlPage(pageNum) {
     const response = await gddlAPI.getAPIResponse(["level", "search"], {
         limit: 25,
         page: pageNum,
-        sort: "popularity",
+        sort: "ID",
         sortDirection: "desc",
-        minRating: 1,
-        maxRating: 39,
         minEnjoymentCount: 1
     });
 
@@ -69,4 +67,4 @@ async function crawl(startPage = 0) {
     process.exit(0);
 }
 
-await crawl(9);
+await crawl(240);
