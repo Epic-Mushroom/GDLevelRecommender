@@ -503,7 +503,7 @@ async function registerUserSubmissionsGDDL(
                 // check if level skills already cached, if not register skills here
                 // note that this is a blocking operation
                 if (registerSkills && !dataManager.cachedLevelInfo.has(levelID) && !dataManager.mainUserEnjProfile.isLevelCompleted(levelID)) {
-                    levelInfo.skills2DArr = await getLevelSkillsGDDL(levelID);
+                    levelInfo.skills2DArr = await getLevelSkills(levelID);
                     console.log(`obtained skills for ${levelInfo.levelName}`);
                     dataManager.addLevelInfoToCache(levelID, levelInfo, true);
                 }
