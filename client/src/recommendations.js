@@ -96,7 +96,7 @@ export class EnjoymentProfile {
 
         /**
          * level ID's mapped to the user's rated enjoyment and the level's info
-         * @type {Map<number, {enjoyment: number, actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
+         * @type {Map<number, {enjoyment: number, actualRating: number, actualEnj: number, levelName: string, levelAuthor: string, skills2DArr: [string, number][]}>}
          */
         this.ratingMap = new Map();
 
@@ -104,6 +104,17 @@ export class EnjoymentProfile {
 
         this.leastFavoriteLevelIDs = [];
         this.favoriteLevelIDs = [];
+
+        this.skills2DArr = [];
+    }
+
+    setSkills(skills2DArr) {
+        if (this.isOther) {
+            // don't need skills of users other than main one
+            return;
+        }
+
+        this.skills2DArr = skills2DArr;
     }
 
     setUsername(username) {
@@ -150,20 +161,16 @@ export class EnjoymentProfile {
     }
 
     getLevelInfo(levelID) {
-        return {
-            actualRating: this.ratingMap.get(levelID)?.actualRating,
-            actualEnj: this.ratingMap.get(levelID)?.actualEnj,
-            levelName: this.ratingMap.get(levelID)?.levelName,
-            levelAuthor: this.ratingMap.get(levelID)?.levelAuthor
-        };
+        const {enjoyment, ...levelInfo} = this.ratingMap.get(levelID);
+        return levelInfo;
     }
 
-    addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {
+    addEnjRating(levelID, enjoyment, levelInfo) {
         if (enjoyment < 0 || enjoyment > 10) {
             return null;
         }
 
-        this.ratingMap.set(levelID, {enjoyment: enjoyment, actualRating: actualRating, actualEnj: actualEnj, levelName: levelName, levelAuthor: levelAuthor});
+        this.ratingMap.set(levelID, {enjoyment: enjoyment, ...levelInfo});
 
         if (!this.isOther || dataManager.mainUserEnjProfile.getEnjoyment(levelID) != null) {
             this.numCommonLevels++;
@@ -264,7 +271,7 @@ class DataManager {
          * contains a cached mapping of levels to be considered in calculation (which are the main user's completed levels
          * and the levels completed by the other users who are collected) to their levelInfo
          * note that this cache does not contain ALL levels to be considered, only ones with cached levelInfo available
-         * @type {Map<number, {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}>}
+         * @type {Map<number, {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string, skills2DArr: [string, number][]}>}
          */
         this.cachedLevelInfo = new Map();
     }
@@ -291,10 +298,10 @@ class DataManager {
     /**
      * 
      * @param {number} levelID 
-     * @param {{actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}} levelInfo 
+     * @param {{actualRating: number, actualEnj: number, levelName: string, levelAuthor: string, skills2DArr: [string, number][]}} levelInfo 
      */
-    addLevelInfoToCache(levelID, levelInfo) {
-        if (this.cachedLevelInfo.has(levelID)) {
+    addLevelInfoToCache(levelID, levelInfo, forceUpdate = false) {
+        if (this.cachedLevelInfo.has(levelID) && !forceUpdate) {
             return;
         }
 
@@ -302,11 +309,11 @@ class DataManager {
         return levelInfo;
     }
 
-    addMainUserEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {
-        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor);
+    addMainUserEnjRating(levelID, enjoyment, levelInfo) {
+        return this.mainUserEnjProfile.addEnjRating(levelID, enjoyment, levelInfo);
     }
 
-    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor) {
+    addOtherUserEnjRating(otherUserID, otherUsername, levelID, enjoyment, levelInfo) {
         if (otherUserID === this.mainUserEnjProfile.userID) {
             return null;
         }
@@ -319,7 +326,7 @@ class DataManager {
             this.otherUserEnjProfileMap.set(otherUserID, new EnjoymentProfile(otherUserID, otherUsername, true));
         }
 
-        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, actualRating, actualEnj, levelName, levelAuthor);
+        return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, levelInfo);
     }
 
     calculateCompatsAndThresholds() {
@@ -422,27 +429,88 @@ class DataManager {
         dataManager.mainUserEnjProfile.setUserID(92);
         dataManager.mainUserEnjProfile.setUsername("diffieHellmanSpongebob93229"); 
 
-        dataManager.addMainUserEnjRating(1, 3, 3);
-        dataManager.addMainUserEnjRating(2, 3, 3);
-        dataManager.addMainUserEnjRating(3, 9, 5);
+        // these may not be accurate but this is for debug purposes anyway
+        const CLUBSTEP = {
+            actualRating: 3,
+            actualEnj: 7,
+            levelName: "Clubstep",
+            levelAuthor: "RobTop"
+        };
+        const TOE2 = {
+            actualRating: 3,
+            actualEnj: 7,
+            levelName: "Theory of Everything 2",
+            levelAuthor: "RobTop"
+        };
+        const DEADLOCKED = {
+            actualRating: 5,
+            actualEnj: 7,
+            levelName: "Deadlocked",
+            levelAuthor: "RobTop"
+        };
+        const DIGITAL_DESCENT = {
+            actualRating: 28,
+            actualEnj: 6,
+            levelName: "Digital Descent",
+            levelAuthor: "CP hoarder"
+        };
+        const AZURITE_SILLOW = {
+            actualRating: 21,
+            actualEnj: 6,
+            levelName: "Azurite",
+            levelAuthor: "Sillow"
+        };
+        const LAZURITE = {
+            actualRating: 5,
+            actualEnj: 5,
+            levelName: "Lazurite",
+            levelAuthor: "i forgot"
+        };
+        const AZURITE_ROYEN = {
+            actualRating: 25,
+            actualEnj: 8,
+            levelName: "Azurite",
+            levelAuthor: "royen"
+        };
+        const HEAVENS_DOOR = {
+            actualRating: 24,
+            actualEnj: 10,
+            levelName: "Heavens Door",
+            levelAuthor: "God"
+        };
+        const ETHEREAL_ARTIFICE = {
+            actualRating: 27,
+            actualEnj: 8,
+            levelName: "Ethereal Artifice",
+            levelAuthor: "Mythra"
+        };
+        const NEXT_STAGE = {
+            actualRating: 30,
+            actualEnj: 5,
+            levelName: "Next Stage",
+            levelAuthor: "zipixbox"
+        };
 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, 3); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, 3); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, 5); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, 28, 6, "Digital Descent"); // Digital Descent
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, 21, 5, "Azurite sillow"); // Azurite sillow
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, 5, 5, "Lazurite"); // Lazurite
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, 24, 5, "Azurite royen"); // Azurite royen
+        dataManager.addMainUserEnjRating(1, 3, CLUBSTEP);
+        dataManager.addMainUserEnjRating(2, 3, TOE2);
+        dataManager.addMainUserEnjRating(3, 9, DEADLOCKED);
 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, 3);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, 3);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, 5);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, 28, 6, "Digital Descent"); // Digital Descent
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, 21, 5, "Azurite sillow"); // Azurite sillow
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, 24, 10, "Heavens Door"); // Heavens Door
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, 28, 8, "Ethereal artifice"); // Ethereal Artifice
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, 30, 5, "next stage"); // Next Stage
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62869408, 7, 29, 7, "chaze"); // Chromatic Haze
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, CLUBSTEP); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, TOE2); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, DEADLOCKED); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, DIGITAL_DESCENT); // Digital Descent
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, AZURITE_SILLOW); // Azurite sillow
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, LAZURITE); // Lazurite
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, AZURITE_ROYEN); // Azurite royen
+
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, CLUBSTEP);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, TOE2);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, DEADLOCKED);
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, DIGITAL_DESCENT); 
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, AZURITE_SILLOW); 
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, HEAVENS_DOOR); 
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, ETHEREAL_ARTIFICE); 
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, NEXT_STAGE); 
     }
 }
 

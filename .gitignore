@@ -27,3 +27,5 @@ dist-ssr
 vite.config.js
 formulas.txt
 to-do-list.txt
+
+pinger.js

@@ -1,6 +1,7 @@
 import {sleep, getNSmallest, getRandomInt} from "../utils.js";
 
 export const GDDL_API_URL = "https://gdladder.com/api";
+export const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";
 const PROXIES = [
     GDDL_API_URL, // directly access gddl from backend
     // `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`,
@@ -111,8 +112,8 @@ class APIError extends Error {
  * @param {Array<string>} pathVariables 
  * @param {Object} queryParams 
  */
-export async function getAPIResponse(pathVariables, queryParams, retried = false, delayedMs = 0) {
-    let resultURL = getRandomProxy();
+export async function getAPIResponse(pathVariables, queryParams, customURL = null, retried = false, delayedMs = 0) {
+    let resultURL = (customURL == null) ? getRandomProxy() : customURL;
 
     for (const variable of pathVariables) {
         resultURL += `/${encodeURIComponent(variable)}`;
@@ -132,7 +133,7 @@ export async function getAPIResponse(pathVariables, queryParams, retried = false
 
         if (response.status === 429 /* && !retried */) {
             await sleep(RATE_LIMIT_DELAY_MS);
-            return await getAPIResponse(pathVariables, queryParams, true, delayedMs + RATE_LIMIT_DELAY_MS);
+            return await getAPIResponse(pathVariables, queryParams, customURL, true, delayedMs + RATE_LIMIT_DELAY_MS);
         }
 
         console.error(`error with request to url ${resultURL}`);

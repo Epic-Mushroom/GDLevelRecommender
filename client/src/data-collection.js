@@ -363,9 +363,16 @@ export async function getLevelSkillsGDDL(levelID, limit = null) {
     }
 }
 
-export async function getLevelSkills(levelID, limit = null) {
+/**
+ * 
+ * @param {number} levelID 
+ * @param {number} limit 
+ * @param {Object} APIResponse pass in the object returned by requestLevelInfo (backend's level/levelID endpoint)
+ * @returns 
+ */
+export async function getLevelSkills(levelID, limit = null, APIResponse = null) {
     try {
-        const levelInfo = await getAPIResponse(["level", levelID], {});
+        const levelInfo = (APIResponse == null) ? await getAPIResponse(["level", levelID], {}) : APIResponse;
         const skillsMap = new Map(); // each skill by id mapped to num of votes
 
         for (const tag of levelInfo.sk) {
@@ -413,22 +420,23 @@ async function registerUserSubmissions(
             actualRating: null,
             actualEnj: null,
             levelName: null,
-            levelAuthor: null
+            levelAuthor: null,
+            skills2DArr: []
         }
 
         const savedLevelInfo = dataManager.cachedLevelInfo.get(rating.l);
         if (savedLevelInfo != null) {
-            levelInfo.actualRating = savedLevelInfo.actualRating;
-            levelInfo.actualEnj = savedLevelInfo.actualEnj;
-            levelInfo.levelName = savedLevelInfo.levelName;
-            levelInfo.levelAuthor = savedLevelInfo.levelAuthor;
+            Object.assign(levelInfo, savedLevelInfo);
 
         } else if (!skipAcquiringLevelInfo) {
             const levelInfoResponse = await requestLevelInfo(rating.l);
-            levelInfo.actualRating = levelInfoResponse.t;
-            levelInfo.actualEnj = levelInfoResponse.e;
-            levelInfo.levelName = levelInfoResponse.n;
-            levelInfo.levelAuthor = levelInfoResponse.a;
+            const {actualRating: t, actualEnj: e, levelName: n, levelAuthor: a} = levelInfoResponse;
+            Object.assign(levelInfo, {t, e, n, a});
+
+            if (isOther) {
+                const skills2DArr = await getLevelSkills(rating.l, null, levelInfoResponse);
+                levelInfo.skills2DArr = skills2DArr;
+            }
 
             dataManager.addLevelInfoToCache(rating.l, levelInfo);
 
@@ -439,16 +447,12 @@ async function registerUserSubmissions(
 
         if (isOther) {
             dataManager.addOtherUserEnjRating(
-                userID, username, rating.l, rating.e,
-                levelInfo?.actualRating, levelInfo?.actualEnj,
-                levelInfo?.levelName, levelInfo?.levelAuthor
+                userID, username, rating.l, rating.e, levelInfo
             );
 
         } else {
             dataManager.addMainUserEnjRating(
-                rating.l, rating.e,
-                levelInfo?.actualRating, levelInfo?.actualEnj,
-                levelInfo?.levelName, levelInfo?.levelAuthor
+                rating.l, rating.e, levelInfo
             );
 
         }
@@ -470,6 +474,8 @@ async function registerUserSubmissionsGDDL(
     maxTier = DEFAULT_MAX_TIER, limit = 19999, sortMethod = DEFAULT_MAIN_USER_SUBMISSIONS_SORT,
     sortDirection = DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION, registerSkills = true
 ) {
+    // not really needed for other users
+    // maybe for potential future "neighbors" feature
     if (username == null) {
         const foundUsername = await requestUsername(userID);  
         username = foundUsername;
@@ -479,14 +485,29 @@ async function registerUserSubmissionsGDDL(
 
     let numSubmissionsRegistered = 0;
 
-    const registration = (response) => {
+    const registration = async (response) => {
         for (const submission of response.submissions) {
+            const levelID = submission.Level.ID;
+            const levelInfo = {
+                actualRating: submission.Level.Rating,
+                actualEnj: submission.Level.Enjoyment, 
+                levelName: submission.Level.Meta.Name, 
+                levelAuthor: submission.Level.Meta.Publisher?.name,
+                skills2DArr: []
+            };
             const argsData = [
-                submission.Level.ID, submission.Enjoyment, submission.Level.Rating,
-                submission.Level.Enjoyment, submission.Level.Meta.Name, submission.Level.Meta.Publisher?.name
+                levelID, submission.Enjoyment, levelInfo
             ]
 
             if (isOther) {
+                // check if level skills already cached, if not register skills here
+                // note that this is a blocking operation
+                if (registerSkills && !dataManager.cachedLevelInfo.has(levelID) && !dataManager.mainUserEnjProfile.isLevelCompleted(levelID)) {
+                    levelInfo.skills2DArr = await getLevelSkillsGDDL(levelID);
+                    console.log(`obtained skills for ${levelInfo.levelName}`);
+                    dataManager.addLevelInfoToCache(levelID, levelInfo, true);
+                }
+
                 dataManager.addOtherUserEnjRating(userID, username, ...argsData);
 
             } else {
@@ -502,14 +523,16 @@ async function registerUserSubmissionsGDDL(
 
     // find the max page first by making a request to the first page
     const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, 0, sortMethod, sortDirection, isOther);
-    registration(response); // register first page of submissions
+    await registration(response); // register first page of submissions
     const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
 
+    // add concurrency here!!!!!!!!
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
-        await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther).then(registration);
+        const response = await requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther);
+        await registration(response);
     }
 
-    console.log(`submission registration for ${username} finished: ${numSubmissionsRegistered} submissions registered`);
+    console.log(`submission registration for ${username} finished using GDDL api: ${numSubmissionsRegistered} submissions registered`);
 }
 
 async function registerAllOtherUserCommonSubmissions() {
@@ -585,10 +608,7 @@ async function registerAllOtherUserCommonSubmissions() {
                     null,
                     levelID,
                     submissionArr[1],
-                    levelInfo.actualRating,
-                    levelInfo.actualEnj,
-                    levelInfo.levelName,
-                    levelInfo.levelAuthor
+                    levelInfo
                 );
 
                 numTotalSubmissionsRegistered++;
@@ -653,6 +673,8 @@ async function registerAllRelevantLevelInfo(minTier = DEFAULT_MIN_TIER, maxTier 
     const response = await requestLevelInfoBatch(megaLevelIDsBatchArr);
 
     for (const levelData of response) {
+        // INCORPORATE SKILLS HERE
+        // .........!!!!!!!!!!!>!<>!<!>!<<!>!<!
         dataManager.addLevelInfoToCache(levelData.levelID, {
             actualRating: levelData.t,
             actualEnj: levelData.e,
