@@ -41,9 +41,9 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const PERFECT_SKILL_MATCH_MULTIPLIER = 1.35;
+const PERFECT_SKILL_MATCH_MULTIPLIER = 2.5;
 // and this is the opposite
-const PERFECT_SKILL_CONTRAST_MULTIPLIER = 0.6;
+const PERFECT_SKILL_CONTRAST_MULTIPLIER = 0.5;
 // for use in modified average weight
 const STEP_3_WEIGHT_CONSTANT = 2.0;
 
@@ -100,7 +100,14 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
 
     if (cumulativeResult > 0 && skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.NONE) {
         const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-        const skillMultiplier = adjustToRange(cosineSim, [-1, 1], [PERFECT_SKILL_CONTRAST_MULTIPLIER, PERFECT_SKILL_MATCH_MULTIPLIER]);
+        let skillMultiplier = 1.0;
+
+        if (cosineSim <= 0.707) {
+            skillMultiplier = adjustToRange(cosineSim, [0, 0.707], [PERFECT_SKILL_CONTRAST_MULTIPLIER, 1.0]);
+        } else {
+            skillMultiplier = adjustToRange(cosineSim, [0.707, 1], [1.0, PERFECT_SKILL_MATCH_MULTIPLIER]);
+        }
+
         cumulativeResult *= skillMultiplier;
     }
 
@@ -458,10 +465,10 @@ class DataManager {
             const newNumRatings = oldNumRatings + 1;
 
             // old calculation: dampened sum to prevent unpopularity bias
-            // const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
+            newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
 
             // new calculation: should prevent both unpopularity and popularity bias
-            newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
+            // newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
 
             this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo})
 

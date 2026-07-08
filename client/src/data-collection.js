@@ -64,12 +64,12 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 17;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 28;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
 // up to [this value] levels from other users will be tracked
-const MAX_OTHER_USER_SUBMISSIONS = 25;
+const MAX_OTHER_USER_SUBMISSIONS = 50;
 // for sorting when gathering submissions from other users' pages
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "levelRating";
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
