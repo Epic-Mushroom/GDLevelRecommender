@@ -201,21 +201,31 @@ function getErrorDetails(err) {
     return errorDetails;
 }
 
-app.get("/api/gddlproxy", async (req, res) => {
+app.get("/api/gddlproxy/*splat", async (req, res) => {
     try {
-        const urlParam = req.query.url;
+        const proxyPath = req.originalUrl.replace("/api/gddlproxy/", "");
+        const resultURL = `${gddlAPI.GDDL_API_URL}/${proxyPath}`;
 
-        if (urlParam != null && urlParam.startsWith(gddlAPI.GDDL_API_URL)) {
-            console.log(`making request to ${urlParam} as proxy`);
-            const response = await gddlAPI.semaphore.addRequestURL(urlParam.toString());  
-            const responseJson = await response.json();  
-            
-            res.json(responseJson);
+        // console.log(`making request to ${resultURL} as proxy`);
+        const response = await gddlAPI.semaphore.addRequestURL(resultURL);  
 
-        } else {
-            res.json({});
-
+        if (!response.ok) {
+            const contentType = response.headers.get("content-type");
+    
+            console.error(`error with request to url ${resultURL}`);
+    
+            if (contentType && contentType.includes("application/json")) {
+                throw new GDDLError(response.status, `${response.status}: ${(await response.json()).message}`);
+    
+            } else {
+                throw new GDDLError(response.status, `${response.status}: ${await response.text()}`);
+    
+            }
         }
+
+        const responseJson = await response.json();  
+        
+        res.json(responseJson);
 
     } catch (err) {
         console.error("failed making request to gddl as proxy");

@@ -7,7 +7,7 @@ const GDDL_API_URL = "https://gdladder.com/api";
 const BACKEND_REDIRECT_URL = "/api"; // redirects to backend
 const GDDL_REDIRECT_URL = "/gddlapi"; // redirects to gddl api
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
-const BACKEND_PROXY_URL = `/api/gddlproxy?url=${encodeURIComponent(GDDL_API_URL)}`;
+const BACKEND_PROXY_URL = `/api/gddlproxy`;
 
 const RATE_LIMIT_DELAY_MS = 250;
 
