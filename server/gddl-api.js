@@ -1,6 +1,6 @@
 import {sleep, getNSmallest, getRandomInt} from "../utils.js";
 
-const GDDL_API_URL = "https://gdladder.com/api";
+export const GDDL_API_URL = "https://gdladder.com/api";
 const PROXIES = [
     GDDL_API_URL, // directly access gddl from backend
     // `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`,
@@ -84,7 +84,7 @@ class Semaphore {
     }
 }
 
-const semaphore = new Semaphore();
+export const semaphore = new Semaphore();
 
 class APIError extends Error {
     /**

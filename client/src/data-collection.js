@@ -7,6 +7,7 @@ const GDDL_API_URL = "https://gdladder.com/api";
 const BACKEND_REDIRECT_URL = "/api"; // redirects to backend
 const GDDL_REDIRECT_URL = "/gddlapi"; // redirects to gddl api
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
+const BACKEND_PROXY_URL = `/api/gddlproxy?url=${encodeURIComponent(GDDL_API_URL)}`;
 
 const RATE_LIMIT_DELAY_MS = 250;
 
@@ -64,7 +65,7 @@ const MAX_OTHER_USERS_TO_COLLECT_FROM = 14;
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
 // up to [this value] levels from other users will be tracked
-const MAX_OTHER_USER_SUBMISSIONS = 27;
+const MAX_OTHER_USER_SUBMISSIONS = 25;
 // for sorting when gathering submissions from other users' pages
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "levelRating";
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
@@ -133,7 +134,7 @@ class APIError extends Error {
  * @param {Object} queryParams 
  */
 async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retried = false) {
-    let resultURL = (useGDDL) ? GDDL_REDIRECT_URL : BACKEND_REDIRECT_URL;
+    let resultURL = (useGDDL) ? BACKEND_PROXY_URL : BACKEND_REDIRECT_URL;
 
     for (const variable of pathVariables) {
         resultURL += `/${encodeURIComponent(variable)}`;

@@ -1,6 +1,6 @@
 import "dotenv/config";
-import express from 'express';
-import {connect, Schema, model} from 'mongoose';
+import express from "express";
+import {connect, Schema, model} from "mongoose";
 
 import * as gddlAPI from "./gddl-api.js";
 
@@ -201,7 +201,30 @@ function getErrorDetails(err) {
     return errorDetails;
 }
 
-app.get('/api/user', async (req, res) => {
+app.get("/api/gddlproxy", async (req, res) => {
+    try {
+        const urlParam = req.query.url;
+
+        if (urlParam != null && urlParam.startsWith(gddlAPI.GDDL_API_URL)) {
+            console.log(`making request to ${urlParam} as proxy`);
+            const response = await gddlAPI.semaphore.addRequestURL(urlParam.toString());  
+            const responseJson = await response.json();  
+            
+            res.json(responseJson);
+
+        } else {
+            res.json({});
+
+        }
+
+    } catch (err) {
+        console.error("failed making request to gddl as proxy");
+        const errorDetails = getErrorDetails(err);
+
+        res.status(errorDetails.status).json({error: errorDetails.message});
+    }
+});
+app.get("/api/user", async (req, res) => {
     try {
         let queryObject = {};
 
@@ -220,7 +243,7 @@ app.get('/api/user', async (req, res) => {
         res.status(errorDetails.status).json({error: errorDetails.message});
     }
 });
-app.get('/api/user/:userID', async (req, res) => {
+app.get("/api/user/:userID", async (req, res) => {
     const id = parseInt(req.params.userID);
 
     try {
@@ -244,7 +267,7 @@ app.get('/api/user/:userID', async (req, res) => {
         res.status(errorDetails.status).json({error: errorDetails.message});
     }
 });
-app.get('/api/level', async (req, res) => {
+app.get("/api/level", async (req, res) => {
     try {
         let queryObject = {};
         let ids = [];
@@ -274,7 +297,7 @@ app.get('/api/level', async (req, res) => {
 
     }
 });
-app.get('/api/level/:levelID', async (req, res) => {
+app.get("/api/level/:levelID", async (req, res) => {
     const id = parseInt(req.params.levelID);
 
     try {
