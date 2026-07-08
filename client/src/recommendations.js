@@ -1,4 +1,4 @@
-import {getRandomInt, getNSmallest, pearson} from "../../utils.js";
+import {getRandomInt, getNSmallest, pearson, normalize2DArr, adjustToRange, invert2DArr, cosineSimilarity} from "../../utils.js";
 
 const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
@@ -38,6 +38,12 @@ const STEP_2_WEIGHT_CALC_N = 1.5;
 const STEP_2_WEIGHT_CALC_P = 1.2;
 const STEP_2_WEIGHT_CALC_B = -260;
 const STEP_2_WEIGHT_CALC_P2 = 2.0;
+// for skill weighting
+const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
+// if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
+const PERFECT_SKILL_MATCH_MULTIPLIER = 1.35;
+// and this is the opposite
+const PERFECT_SKILL_CONTRAST_MULTIPLIER = 0.6;
 // for use in modified average weight
 const STEP_3_WEIGHT_CONSTANT = 2.0;
 
@@ -45,12 +51,14 @@ const STEP_3_WEIGHT_CONSTANT = 2.0;
  * 
  * @param {number} enjoyment 
  * @param {number} rating 
+ * @param {[string, number][]} levelSkills
  * @param {number} maxTier 
  * @param {number} minTier 
  * @param {number} compatThreshold 
+ * @param {EnjoymentProfile} mainUserProfile
  * @returns 
  */
-export function calculateWeight(enjoyment, rating, minTier, maxTier, compatThreshold) {
+export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier, compatThreshold, mainUserProfile) {
     // old formula (very complex and honestly not even good)
     // const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
     // const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
@@ -66,11 +74,39 @@ export function calculateWeight(enjoyment, rating, minTier, maxTier, compatThres
     const compatMultiplier = (compatThreshold / 100.0) ** STEP_2_WEIGHT_CALC_P2;
     cumulativeResult += step1Result * compatMultiplier
 
+    // skill weighting here
+    const skillWeightPref = mainUserProfile?.skillWeightPref;
+    let modifiedUserSkills = [];
+    let modifiedLevelSkills = normalize2DArr(levelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+    switch (skillWeightPref) {
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.NONE:
+            break;
+
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.MATCH:
+            modifiedUserSkills = normalize2DArr(mainUserProfile?.skills2DArr, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            break;
+
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE:
+            modifiedUserSkills = normalize2DArr(invert2DArr(mainUserProfile?.skills2DArr), SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            break;
+
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.LIKE:
+            modifiedUserSkills = normalize2DArr(mainUserProfile?.calculateLikedSkills(), SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            break;
+
+        default:
+            break;
+    }
+
+    if (cumulativeResult > 0 && skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.NONE) {
+        const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+        const skillMultiplier = adjustToRange(cosineSim, [-1, 1], [PERFECT_SKILL_CONTRAST_MULTIPLIER, PERFECT_SKILL_MATCH_MULTIPLIER]);
+        cumulativeResult *= skillMultiplier;
+    }
+
     if (rating < minTier || rating > maxTier) {
         cumulativeResult -= 99999;
     }
-
-    // skill weighting here
 
     return cumulativeResult;
 }
@@ -84,6 +120,14 @@ class DataError extends Error {
 }
 
 export class EnjoymentProfile {
+    // modifies how the main user's skillset affects weighting
+    static SKILL_WEIGHT_PREF = Object.freeze({
+        NONE: "NONE", // skills are not taken into account
+        MATCH: "MATCH", // tries to weight levels that match user's skillset
+        OPPOSITE: "OPPOSITE", // tries to weight levels that contrast user's skillset
+        LIKE: "LIKE" // tries to determine the skills the user likes, and matches those (not going to implement for a while)
+    });
+
     constructor(userID = DEFAULT_USER_ID, username = DEFAULT_USERNAME, isOther = false) {
         this.userID = userID;
         this.username = username;
@@ -106,6 +150,8 @@ export class EnjoymentProfile {
         this.favoriteLevelIDs = [];
 
         this.skills2DArr = [];
+        this.likedSkills2DArr = [];
+        this.skillWeightPref = EnjoymentProfile.SKILL_WEIGHT_PREF.MATCH;
     }
 
     setSkills(skills2DArr) {
@@ -115,6 +161,29 @@ export class EnjoymentProfile {
         }
 
         this.skills2DArr = skills2DArr;
+    }
+
+    /**
+     * 
+     * @param {string} pref 
+     */
+    setSkillWeightPref(pref) {
+        this.skillWeightPref = pref;
+    }
+
+    /**
+     * 
+     * @returns {[string, number][]}
+     */
+    calculateLikedSkills() {
+        if (this.likedSkills2DArr.length > 0) {
+            return this.likedSkills2DArr;
+        }
+
+        // ...
+
+        this.likedSkills2DArr = this.skills2DArr;
+        return this.likedSkills2DArr;
     }
 
     setUsername(username) {
@@ -411,7 +480,8 @@ class DataManager {
                 const enjRating = ratingInfo.enjoyment;
                 const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
                 const actualRating = ratingInfo.actualRating;
-                const calculatedWeight = calculateWeight(adjustedEnjRating, actualRating, minTier, maxTier, otherUserEnjProfile.compatThreshold);
+                const levelSkills = ratingInfo.skills2DArr;
+                const calculatedWeight = calculateWeight(adjustedEnjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.compatThreshold, this.mainUserEnjProfile);
                 this.addWeight(levelID, calculatedWeight, ratingInfo);
             }
         }

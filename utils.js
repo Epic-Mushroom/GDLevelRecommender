@@ -187,3 +187,27 @@ export function adjustToRange(value, oldRange, newRange) {
     const rangeProportion = (oldRangeLength === 0) ? 0 : ((value - oldRange[0]) * 1.0 / oldRangeLength);
     return newRange[0] + rangeProportion * newRangeLength;
 }
+
+/**
+ * calculates cosine similarity between two 2D arrays as vectors
+ * @param {[*, number][]} arr2D1 
+ * @param {[*, number][]} arr2D2 
+ */
+export function cosineSimilarity(arr2D1, arr2D2, magnitude1, magnitude2) {
+    if (magnitude1 === 0 || magnitude2 === 0) {
+        return 0;
+    }
+
+    const map1 = new Map(arr2D1);
+    const map2 = new Map(arr2D2);
+
+    let dotProduct = 0;
+    for (const key of map1.keys()) {
+        const val1 = (map1.get(key) == null) ? 0 : map1.get(key);
+        const val2 = (map2.get(key) == null) ? 0 : map2.get(key);
+
+        dotProduct += val1 * val2;
+    }
+
+    return dotProduct * 1.0 / (magnitude1 * magnitude2);
+}

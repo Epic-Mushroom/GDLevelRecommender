@@ -41,7 +41,6 @@ export const SKILLS_MAPPING = new Map([
     ["Slow-Paced", "19"],
     [null, "0"]
 ]);
-export const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 
 const NUM_SUBMISSIONS_PER_USER_PAGE = 25;
 const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
@@ -504,7 +503,7 @@ async function registerUserSubmissionsGDDL(
                 // note that this is a blocking operation
                 if (registerSkills && !dataManager.cachedLevelInfo.has(levelID) && !dataManager.mainUserEnjProfile.isLevelCompleted(levelID)) {
                     levelInfo.skills2DArr = await getLevelSkills(levelID);
-                    console.log(`obtained skills for ${levelInfo.levelName}`);
+                    // console.log(`obtained skills for ${levelInfo.levelName}`);
                     dataManager.addLevelInfoToCache(levelID, levelInfo, true);
                 }
 
@@ -703,6 +702,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     }
 
     // stage 0: collect initial data
+    // should move this to its own function 
     let timestamp = Date.now();
     const userDetails = await requestUserDetails(username);
     if (userDetails == null) {
@@ -717,6 +717,12 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, foundUsername, false);
     console.log(`set ${foundUsername}'s enj profile as the main enj profile`);
+
+    getUserSkillsGDDL(userID).then((userSkills) => {
+        dataManager.mainUserEnjProfile.setSkills(userSkills);
+        console.log(`obtained user's skills for ${foundUsername}`);
+    });
+
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 0 TIME ELAPSED: ${timeElapsedPerStage[0]}ms`);
 
