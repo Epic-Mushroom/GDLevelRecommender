@@ -150,6 +150,10 @@ export function pearson(ratings1, ratings2) {
  * @param {[*, number][]} arr2D 
  */
 export function normalize2DArr(arr2D, magnitude) {
+    if (arr2D == null) {
+        return arr2D;
+    }
+
     const sumOfSquaredWeights = arr2D.reduce((sum, keyValPair) => sum + keyValPair[1] ** 2, 0);
     const oldMagnitude = Math.sqrt(sumOfSquaredWeights);
     const ratio = magnitude / oldMagnitude;

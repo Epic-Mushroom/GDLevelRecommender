@@ -1,5 +1,5 @@
 import * as dataCollection from "./data-collection.js";
-import {purifyInt, reverseMap, sleep} from "../../utils.js";
+import {getNSmallest, purifyInt, reverseMap, sleep} from "../../utils.js";
 
 const CLIENT_TICK_DELAY = 50; // milliseconds
 
@@ -56,30 +56,35 @@ async function addLevelCard(levelID, levelInfo) {
     const tier = levelCardFragment.querySelector(".tier");
     const enj = levelCardFragment.querySelector(".enjoyment");
 
+    const {
+        actualRating: tierValue, 
+        actualEnj: enjValue, 
+        levelName: name, 
+        levelAuthor: author, 
+        skills2DArr: skillsArr
+    } = levelInfo;
+
     levelIDText.textContent = levelID;
 
-    dataCollection.getLevelSkills(levelID, 3).then(arr => {
-        const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
-        let skillsString = arr.map(elem => mapToSkillName.get(elem[0])).join(", ");
+    const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
+    const top3Skills = getNSmallest(skillsArr, 3, (kvp) => -kvp[1]);
+    let skillsString = top3Skills.map(elem => mapToSkillName.get(elem[0])).join(", ");
 
-        if (skillsString === "") {
-            skillsString += "No skills found";
-        }
+    if (skillsString === "") {
+        skillsString += "No skills found";
+    }
 
-        skillCard.textContent = skillsString;
-    });
+    skillCard.textContent = skillsString;
 
-    dataCollection.requestLevelInfo(levelID).then(response => {
-        levelName.textContent = response.n;
-        authorName.textContent = response.a;
-        tier.textContent = Math.round(response.t);
-        enj.textContent = Math.round(response.e);
+    levelName.textContent = name;
+    authorName.textContent = author;
+    tier.textContent = Math.round(tierValue);
+    enj.textContent = Math.round(enjValue);
 
-        if (authorName.textContent == null) {
-            const author = levelCardFragment.querySelector(".author");
-            author.style.setProperty("display", "none");
-        }
-    });
+    if (authorName.textContent == null) {
+        const author = levelCardFragment.querySelector(".author");
+        author.style.setProperty("display", "none");
+    }
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");

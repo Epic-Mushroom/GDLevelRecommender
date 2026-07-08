@@ -7,10 +7,10 @@ const GDDL_API_URL = "https://gdladder.com/api";
 const BACKEND_REDIRECT_URL = "/api"; // redirects to backend
 const GDDL_REDIRECT_URL = "/gddlapi"; // redirects to gddl api
 const PROXY_URL = `https://corsproxy.io/?${encodeURIComponent(GDDL_API_URL)}`;
-const BACKEND_PROXY_URL = `/api/gddlproxy`; // redirects to proxy of gddl api hosted on backend
+const GDDL_PROXY_URL = `/api/gddlproxy`; // redirects to proxy of gddl api hosted on backend, use to make reqs to gddl when 429'd
 const PROXIES = [
     GDDL_REDIRECT_URL, // directly access gddl from backend
-    BACKEND_PROXY_URL
+    GDDL_PROXY_URL
 ]
 const getRandomProxy = () => PROXIES[getRandomInt(0, PROXIES.length - 1)];
 
@@ -138,7 +138,8 @@ class APIError extends Error {
  * @param {Object} queryParams 
  */
 async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retried = false) {
-    let resultURL = (useGDDL) ? GDDL_REDIRECT_URL : BACKEND_REDIRECT_URL;
+    const gddlBaseURL = (retried) ? GDDL_PROXY_URL : GDDL_REDIRECT_URL;
+    let resultURL = (useGDDL) ? gddlBaseURL : BACKEND_REDIRECT_URL;
 
     for (const variable of pathVariables) {
         resultURL += `/${encodeURIComponent(variable)}`;
@@ -157,7 +158,7 @@ async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retri
         trackers.numAPIErrors++;
 
         if (response.status === 429 && !retried) {
-            console.log("rate limited... waiting 250 ms to retry");
+            console.log("rate limited... waiting 250 ms to retry from proxy");
             await sleep(RATE_LIMIT_DELAY_MS);
             return await getAPIResponse(pathVariables, queryParams, useGDDL, true);
         }
@@ -505,6 +506,10 @@ async function registerUserSubmissionsGDDL(
                     levelInfo.skills2DArr = await getLevelSkills(levelID);
                     // console.log(`obtained skills for ${levelInfo.levelName}`);
                     dataManager.addLevelInfoToCache(levelID, levelInfo, true);
+
+                } else {
+                    levelInfo.skills2DArr = dataManager.cachedLevelInfo.get(levelID).skills2DArr;
+
                 }
 
                 dataManager.addOtherUserEnjRating(userID, username, ...argsData);
@@ -727,12 +732,13 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log(`STAGE 0 TIME ELAPSED: ${timeElapsedPerStage[0]}ms`);
 
     // stage 1: registering user submissions
+    // uses the backend db to fetch submissions
     timestamp = Date.now();
     await registerUserSubmissions(userID, foundUsername, false); // intentionally leaving out min and max tier to get better user tastes
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 1 TIME ELAPSED: ${timeElapsedPerStage[1]}ms`);
 
-    // stage 2: collecting a list of users to analyze until the limit is reached
+    // stage 2: collecting a list of users to analyze
     timestamp = Date.now();
     await registerAllOtherUserCommonSubmissions();
     timeElapsedPerStage.push(Date.now() - timestamp);
@@ -744,10 +750,6 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log("calculated compatibilities and thresholds");
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 3 TIME ELAPSED: ${timeElapsedPerStage[3]}ms`);
-
-    // this effectively uses the browser to crawl the database adding to backend in the background
-    // and this should really not be left in on release
-    // registerAllRelevantLevelInfo(minTier, maxTier, dataManager.getMostCommonPlayers(20));
 
     // stage 4: registering the submissions of the collected users
     timestamp = Date.now();

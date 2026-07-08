@@ -41,9 +41,12 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const PERFECT_SKILL_MATCH_MULTIPLIER = 2.5;
+const MAX_SKILL_MATCH_MULTIPLIER = 2.5;
 // and this is the opposite
-const PERFECT_SKILL_CONTRAST_MULTIPLIER = 0.5;
+const MAX_SKILL_CONTRAST_MULTIPLIER = 0.5;
+// multiplies this with perfect match multiplier and multiplies the reciprocal with perfect contrast multiplier
+// when trying to aggressively fit skills
+const SKILL_FIT_AGGRESSION_MULTIPLIER = 2.2;
 // for use in modified average weight
 const STEP_3_WEIGHT_CONSTANT = 2.0;
 
@@ -102,10 +105,17 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
         const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
         let skillMultiplier = 1.0;
 
+        const maxMultiplier = ((mainUserProfile.skillWeightAggression) ?
+            (MAX_SKILL_MATCH_MULTIPLIER * SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_MATCH_MULTIPLIER
+        );
+        const minMultiplier = ((mainUserProfile.skillWeightAggression) ?
+            (MAX_SKILL_CONTRAST_MULTIPLIER / SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_CONTRAST_MULTIPLIER
+        );
+
         if (cosineSim <= 0.707) {
-            skillMultiplier = adjustToRange(cosineSim, [0, 0.707], [PERFECT_SKILL_CONTRAST_MULTIPLIER, 1.0]);
+            skillMultiplier = adjustToRange(cosineSim, [0, 0.707], [minMultiplier, 1.0]);
         } else {
-            skillMultiplier = adjustToRange(cosineSim, [0.707, 1], [1.0, PERFECT_SKILL_MATCH_MULTIPLIER]);
+            skillMultiplier = adjustToRange(cosineSim, [0.707, 1], [1.0, maxMultiplier]);
         }
 
         cumulativeResult *= skillMultiplier;
@@ -159,6 +169,7 @@ export class EnjoymentProfile {
         this.skills2DArr = [];
         this.likedSkills2DArr = [];
         this.skillWeightPref = EnjoymentProfile.SKILL_WEIGHT_PREF.MATCH;
+        this.skillWeightAggression = false;
     }
 
     setSkills(skills2DArr) {
@@ -364,7 +375,9 @@ class DataManager {
         /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
-         * @type {Map<number, {rawTotalWeight: number, weight: number, numRatings: number, levelInfo: {actualRating: number, actualEnj: number, levelName: string, levelAuthor: string}}>}
+         * @type {Map<number, {rawTotalWeight: number, weight: number, numRatings: number, levelInfo: {
+         *          actualRating: number, actualEnj: number, levelName: string, levelAuthor: string, skills2DArr: [string, number][]
+         *        }}>}
          */
         this.levelWeightsMap = new Map();
 
@@ -511,62 +524,79 @@ class DataManager {
             actualRating: 3,
             actualEnj: 7,
             levelName: "Clubstep",
-            levelAuthor: "RobTop"
+            levelAuthor: "RobTop",
+            skills2DArr: []
         };
         const TOE2 = {
             actualRating: 3,
             actualEnj: 7,
             levelName: "Theory of Everything 2",
-            levelAuthor: "RobTop"
+            levelAuthor: "RobTop",
+            skills2DArr: []
         };
         const DEADLOCKED = {
             actualRating: 5,
             actualEnj: 7,
             levelName: "Deadlocked",
-            levelAuthor: "RobTop"
+            levelAuthor: "RobTop",
+            skills2DArr: []
         };
         const DIGITAL_DESCENT = {
             actualRating: 28,
             actualEnj: 6,
             levelName: "Digital Descent",
-            levelAuthor: "CP hoarder"
+            levelAuthor: "CP hoarder",
+            skills2DArr: []
         };
         const AZURITE_SILLOW = {
             actualRating: 21,
             actualEnj: 6,
             levelName: "Azurite",
-            levelAuthor: "Sillow"
+            levelAuthor: "Sillow",
+            skills2DArr: []
         };
         const LAZURITE = {
             actualRating: 5,
             actualEnj: 5,
             levelName: "Lazurite",
-            levelAuthor: "i forgot"
+            levelAuthor: "i forgot",
+            skills2DArr: []
         };
         const AZURITE_ROYEN = {
             actualRating: 25,
             actualEnj: 8,
             levelName: "Azurite",
-            levelAuthor: "royen"
+            levelAuthor: "royen",
+            skills2DArr: []
         };
         const HEAVENS_DOOR = {
             actualRating: 24,
             actualEnj: 10,
             levelName: "Heavens Door",
-            levelAuthor: "God"
+            levelAuthor: "God",
+            skills2DArr: []
         };
         const ETHEREAL_ARTIFICE = {
             actualRating: 27,
             actualEnj: 8,
             levelName: "Ethereal Artifice",
-            levelAuthor: "Mythra"
+            levelAuthor: "Mythra",
+            skills2DArr: []
         };
         const NEXT_STAGE = {
             actualRating: 30,
             actualEnj: 5,
             levelName: "Next Stage",
-            levelAuthor: "zipixbox"
+            levelAuthor: "zipixbox",
+            skills2DArr: []
         };
+        const SLAUGHTERHOUSE = {
+            actualRating: 38,
+            actualEnj: 3,
+            levelName: "Slaughterhouse",
+            levelAuthor: "IcEDCave",
+            skills2DArr: []
+        }
 
         dataManager.addMainUserEnjRating(1, 3, CLUBSTEP);
         dataManager.addMainUserEnjRating(2, 3, TOE2);
@@ -588,6 +618,7 @@ class DataManager {
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, HEAVENS_DOOR); 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, ETHEREAL_ARTIFICE); 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, NEXT_STAGE); 
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 27690100, 10, SLAUGHTERHOUSE); 
     }
 }
 
