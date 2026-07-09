@@ -433,6 +433,7 @@ p {
 
   padding: 5px 14px;
 
+  font-size: 90%;
   max-width: calc(100% - 5px);
 }
 

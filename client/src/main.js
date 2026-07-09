@@ -122,6 +122,17 @@ async function addLevelCard(levelID, levelWeightInfo) {
     }
 
     recInfo.title = breakDownWeightCalculations(levelWeightInfo);
+    trashRec.addEventListener("click", async () => {
+        const newLevelRec = dataCollection.getNextRecommendation();
+
+        if (newLevelRec != null) {
+            await replaceLevelCard(levelCard, newLevelRec[0], newLevelRec[1]);
+
+        } else {
+            await replaceLevelCard(levelCard, null, null)
+
+        }
+    })
     gddlLink.addEventListener("click", () => {
         window.open(`https://gdladder.com/level/${levelID}`, "_blank");
     });
@@ -136,14 +147,22 @@ async function addLevelCard(levelID, levelWeightInfo) {
             showcase.title = "No video was found for this level";
 
         }
-        
+
     }).catch((err) => {
         showcase.title = "No video was found for this level";
 
-    })
+    });
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
+}
+
+async function replaceLevelCard(oldLevelCard, newLevelID, newLevelWeightInfo) {
+    oldLevelCard.style.setProperty("display", "none");
+
+    if (newLevelID != null && newLevelWeightInfo != null) {
+        await addLevelCard(newLevelID, newLevelWeightInfo);
+    }
 }
 
 async function displayRecommendations(username, minTier, maxTier, skillWeightPref) {

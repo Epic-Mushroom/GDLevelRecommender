@@ -48,6 +48,7 @@ const NUM_SUBMISSIONS_PER_LEVEL_PAGE = 30;
 export const DEFAULT_MIN_TIER = 1;
 export const DEFAULT_MAX_TIER = 39;
 
+const DEFAULT_NUM_RECOMMENDATIONS = 9;
 const DEFAULT_MAIN_USER_SUBMISSIONS_SORT = "enjoyment";
 const DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 // UNUSED:
@@ -80,7 +81,9 @@ const MAX_LEVEL_ID_BATCH_SIZE = 200;
 export const trackers = {
     numAPICalls: 0,
     numAPISuccesses: 0,
-    numAPIErrors: 0
+    numAPIErrors: 0,
+
+    numRecommendationsSent: 0
 }
 
 export const flags = {
@@ -709,12 +712,17 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     // index is the stage
     const timeElapsedPerStage = [];
 
+    // debug purposes only
     if (username === DEBUG_USERNAME) {
         dataManager.useDebugData();
 
         dataManager.calculateAllCompats();
         dataManager.addAllWeights(minTier, maxTier);
-        return dataManager.getMostRecommendedLevels();
+
+
+        const levelRecs = dataManager.getMostRecommendedLevels();
+        trackers.numRecommendationsSent += levelRecs.length;
+        return levelRecs;
     }
 
     // stage 0: collect initial data
@@ -782,7 +790,18 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     const totalTimeElapsed = timeElapsedPerStage.reduce(((acc, elem) => acc + elem), 0);
     console.log(`TOTAL TIME ELAPSED: ${totalTimeElapsed}ms`);
 
-    return dataManager.getMostRecommendedLevels();
+    const levelRecs = dataManager.getMostRecommendedLevels(DEFAULT_NUM_RECOMMENDATIONS);
+    trackers.numRecommendationsSent += levelRecs.length;
+    return levelRecs;
+}
+
+export function getNextRecommendation() {
+    if (trackers.numRecommendationsSent === 0) {
+        return;
+    }
+
+    trackers.numRecommendationsSent++;
+    return dataManager.getNthMostRecommendedLevel(trackers.numRecommendationsSent);
 }
 
 export function resetDataManager() {

@@ -1,6 +1,7 @@
 import {
     getRandomInt, getNBest, pearsonSimilarity, normalize2DArr, 
-    adjustToRange, invert2DArr, cosineSimilarity, scoreVector
+    adjustToRange, invert2DArr, cosineSimilarity, scoreVector,
+    getNthBest
 } from "../../utils.js";
 
 const DEFAULT_USER_ID = 92;
@@ -559,8 +560,14 @@ class DataManager {
         }
     }
 
-    getMostRecommendedLevels(limit = 9, minTier, maxTier) {
+    getMostRecommendedLevels(limit = 9) {
         return getNBest(this.levelWeightsMap, limit, ([key, val]) => {
+            return -this.levelWeightsMap.get(key).weight;
+        });
+    }
+
+    getNthMostRecommendedLevel(n) {
+        return getNthBest(this.levelWeightsMap, n, ([key, val]) => {
             return -this.levelWeightsMap.get(key).weight;
         });
     }
@@ -655,7 +662,21 @@ class DataManager {
             levelName: "angelicide 6",
             levelAuthor: "me",
             skills2DArr: []
-        }
+        };
+        const DOESNT_EXIST_2 = {
+            actualRating: 1,
+            actualEnj: 0,
+            levelName: "angelicide 67",
+            levelAuthor: "me",
+            skills2DArr: []
+        };
+        const DOESNT_EXIST_3 = {
+            actualRating: 12,
+            actualEnj: 5,
+            levelName: "stop",
+            levelAuthor: "itsadvystylez",
+            skills2DArr: []
+        };
 
         dataManager.addMainUserEnjRating(1, 3, CLUBSTEP);
         dataManager.addMainUserEnjRating(2, 3, TOE2);
@@ -664,10 +685,12 @@ class DataManager {
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, CLUBSTEP); 
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, TOE2); 
         dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, DEADLOCKED); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, DIGITAL_DESCENT); // Digital Descent
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, AZURITE_SILLOW); // Azurite sillow
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, LAZURITE); // Lazurite
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, AZURITE_ROYEN); // Azurite royen
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, DIGITAL_DESCENT); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, AZURITE_SILLOW); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, LAZURITE); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, AZURITE_ROYEN); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 23232233, 10, DOESNT_EXIST_2); 
+        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 23232234, 10, DOESNT_EXIST_3); 
 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, CLUBSTEP);
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, TOE2);

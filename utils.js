@@ -79,6 +79,24 @@ export function getNBest(iterable, n, func = (a) => a) {
     return resultArr;
 }
 
+/**
+ * gets the nth element of an iterable sorted by a function, without sorting
+ * @template T
+ * @param {Iterable<T>} iterable 
+ * @param {number} n 
+ * @param {function(T): number} func a function that is called on each element to use the result as the basis for sorting
+ * @returns {T}
+ */
+export function getNthBest(iterable, n, func = (a) => a) {
+    const nBest = getNBest(iterable, n, func);
+
+    if (nBest.length < n) {
+        return null;
+    }
+
+    return nBest[n - 1];
+}
+
 export function reverseMap(map) {
     return new Map(Array.from(map, ([key, val]) => [val, key]));
 }
