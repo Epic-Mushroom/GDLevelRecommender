@@ -22,7 +22,7 @@ const STEP_1_WEIGHT_CALC_B = -500;
 const STEP_1_WEIGHT_CALC_M = 100;
 const STEP_1_WEIGHT_CALC_A = 5;
 const STEP_1_WEIGHT_CALC_B2 = -200;
-// OLD step 2 weight calc formula: (-1)^X * M * (N * compatThreshold)^P + B
+// OLD step 2 weight calc formula: (-1)^X * M * (N * adjustedCompat)^P + B
 // X = 0 if step 1's weight > 0, X = 1 otherwise
 // add step 2 to step 1
 // basically, 
@@ -31,7 +31,7 @@ const STEP_1_WEIGHT_CALC_B2 = -200;
 // if other user likes a level, and low compat, decrease the weight
 // if other user doesn't like a level, and low compat, increase the weight <=== THIS WAS NOT A GOOD IDEA
 //
-// NEW step 2 weight calc formula: (compatThreshold / 100)^P2
+// NEW step 2 weight calc formula: (adjustedCompat / 100)^P2
 // MULTIPLY step 2 with step 1
 const STEP_2_WEIGHT_CALC_M = 1.3;
 const STEP_2_WEIGHT_CALC_N = 1.5;
@@ -41,14 +41,17 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const MAX_SKILL_MATCH_MULTIPLIER = 2.5;
+const MAX_SKILL_MATCH_MULTIPLIER = 1.4;
 // and this is the opposite
-const MAX_SKILL_CONTRAST_MULTIPLIER = 0.5;
+const MAX_SKILL_CONTRAST_MULTIPLIER = 0.27;
 // multiplies this with perfect match multiplier and multiplies the reciprocal with perfect contrast multiplier
 // when trying to aggressively fit skills
 const SKILL_FIT_AGGRESSION_MULTIPLIER = 2.2;
 // for use in modified average weight
 const STEP_3_WEIGHT_CONSTANT = 2.0;
+const STEP_3_WEIGHT_CALC_B = 0.6174;
+const STEP_3_WEIGHT_CALC_A = 0.2377;
+const STEP_3_WEIGHT_CALC_A2 = 0.588235294;
 
 /**
  * 
@@ -57,15 +60,15 @@ const STEP_3_WEIGHT_CONSTANT = 2.0;
  * @param {[string, number][]} levelSkills
  * @param {number} maxTier 
  * @param {number} minTier 
- * @param {number} compatThreshold 
+ * @param {number} adjustedCompat 
  * @param {EnjoymentProfile} mainUserProfile
  * @returns 
  */
-export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier, compatThreshold, mainUserProfile) {
+export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier, adjustedCompat, mainUserProfile) {
     // old formula (very complex and honestly not even good)
     // const step1Result = STEP_1_WEIGHT_CALC_B + enjoyment * STEP_1_WEIGHT_CALC_M * 1.0;
     // const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
-    // let cumulativeResult = step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * compatThreshold) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
+    // let cumulativeResult = step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * adjustedCompat) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
 
     // if (rating < minTier || rating > maxTier) {
     //     cumulativeResult -= 99999;
@@ -74,7 +77,7 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     // new formula
     let cumulativeResult = 0;
     const step1Result = STEP_1_WEIGHT_CALC_A * (enjoyment ** 2) + STEP_1_WEIGHT_CALC_B2;
-    const compatMultiplier = (compatThreshold / 100.0) ** STEP_2_WEIGHT_CALC_P2;
+    const compatMultiplier = (adjustedCompat / 100.0) ** STEP_2_WEIGHT_CALC_P2;
     cumulativeResult += step1Result * compatMultiplier
 
     // skill weighting here
@@ -153,7 +156,7 @@ export class EnjoymentProfile {
         this.avgEnjoyment = null;
 
         this.compat = (!isOther) ? BASE_COMPAT : null;
-        this.compatThreshold = (!isOther) ? 100.0 : null;
+        this.adjustedCompat = (!isOther) ? 100.0 : null;
 
         /**
          * level ID's mapped to the user's rated enjoyment and the level's info
@@ -320,16 +323,16 @@ export class EnjoymentProfile {
 
     // returns a percentile relating to how much this user is compatible with the main user's enjoyments
     // higher percentile = more useful
-    calculateCompatThreshold() {
-        if (this.compatThreshold != null) {
-            return this.compatThreshold;
+    calculateAdjustedCompat() {
+        if (this.adjustedCompat != null) {
+            return this.adjustedCompat;
         }
 
         this.compat = this.calculateCompat();
         
         if (this.compat == null) {
             // should only rarely be the case (happens if there are no levels in common)
-            this.compatThreshold = null;
+            this.adjustedCompat = null;
             return null;
         }
 
@@ -338,15 +341,22 @@ export class EnjoymentProfile {
         }
 
         // assumes all compats are already sorted in ascending order
-        for (let i = 0; i < dataManager.compatArr.length; i++) {
-            const compatValue = dataManager.compatArr[i];
-            if (compatValue != null && compatValue >= this.compat) {
-                return this.compatThreshold = (100.0 * i) / dataManager.compatArr.length;
-            }
+        const maxCompatValue = dataManager.compatArr[dataManager.compatArr.length - 1];
+        const minCompatValue = dataManager.compatArr[0];
 
-        }
+        // percentile-based calculation
+        // for (let i = 0; i < dataManager.compatArr.length; i++) {
+        //     const compatValue = dataManager.compatArr[i];
+        //     if (compatValue != null && compatValue >= this.compat) {
+        //         return this.adjustedCompat = (100.0 * i) / dataManager.compatArr.length;
+        //     }
 
-        return this.compatThreshold;
+        // }
+
+        // ratio-based calculation
+        this.adjustedCompat = adjustToRange(this.compat, [minCompatValue, maxCompatValue], [0, 100]);
+
+        return this.adjustedCompat;
     }
 }
 
@@ -370,7 +380,7 @@ class DataManager {
          * @type {Map<number, EnjoymentProfile>}
          */
         this.otherUserEnjProfileMap = new Map();
-        // just contains the compatibility values of all collected players, used to calculate compat threshold
+        // just contains the compatibility values of all collected players, used to calculate adjusted compat
         this.compatArr = [];
         /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
@@ -418,7 +428,7 @@ class DataManager {
         return this.otherUserEnjProfileMap.get(otherUserID).addEnjRating(levelID, enjoyment, levelInfo);
     }
 
-    calculateCompatsAndThresholds() {
+    calculateAllCompats() {
         this.compatArr = [];
 
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
@@ -428,7 +438,7 @@ class DataManager {
         this.compatArr.sort((a, b) => a - b);
 
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
-            otherUserEnjProfile.calculateCompatThreshold();
+            otherUserEnjProfile.calculateAdjustedCompat();
         }
     }
 
@@ -444,48 +454,47 @@ class DataManager {
 
     getMostCompatiblePlayers(limit = 10, minRatings = 1) {
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
-            if (a.compatThreshold == null || a.ratingMap.size < minRatings) {
+            if (a.adjustedCompat == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
 
-            return -1 * a.compatThreshold;
+            return -1 * a.adjustedCompat;
         });
     }
 
     getLeastCompatiblePlayers(limit = 10, minRatings = 1) {
         return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
-            if (a.compatThreshold == null || a.ratingMap.size < minRatings) {
+            if (a.adjustedCompat == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
 
-            return a.compatThreshold;
+            return a.adjustedCompat;
         });
     }
 
     addWeight(levelID, weight, levelInfo) {
         const oldWeightData = this.levelWeightsMap.get(levelID);
-        let newWeight = weight / (1 + STEP_3_WEIGHT_CONSTANT);
 
-        if (oldWeightData == null) {
-            this.levelWeightsMap.set(levelID, {rawTotalWeight: weight, weight: newWeight, numRatings: 1, levelInfo: levelInfo});
+        const oldRawTotalWeight = oldWeightData?.rawTotalWeight || 0;
+        const oldWeight = oldWeightData?.weight || 0;
+        const oldNumRatings = oldWeightData?.numRatings || 0;
 
-        } else {
-            const oldRawTotalWeight = oldWeightData.rawTotalWeight;
-            const oldWeight = oldWeightData.weight;
-            const oldNumRatings = oldWeightData.numRatings;
+        const newRawTotalWeight = oldRawTotalWeight + weight;
+        const newNumRatings = oldNumRatings + 1;
 
-            const newRawTotalWeight = oldRawTotalWeight + weight;
-            const newNumRatings = oldNumRatings + 1;
+        // old calculation: dampened sum to prevent unpopularity bias
+        // const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
 
-            // old calculation: dampened sum to prevent unpopularity bias
-            newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
+        // new calculation: should prevent both unpopularity and popularity bias
+        // const newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
 
-            // new calculation: should prevent both unpopularity and popularity bias
-            // newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
+        // newer calculation: uses a logarithmic multiplier 
+        // const newWeight = newRawTotalWeight * 1.0 * (STEP_3_WEIGHT_CALC_B + STEP_3_WEIGHT_CALC_A * Math.log(newNumRatings)) / newNumRatings;
 
-            this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo})
+        // newer v2 calculation: uses a multiplier defined by exponential decay
+        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
 
-        }
+        this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo});
 
         return newWeight;
     }
@@ -493,7 +502,7 @@ class DataManager {
     addAllWeights(minTier = 1, maxTier = 39) {
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
             for (const [levelID, ratingInfo] of otherUserEnjProfile.ratingMap) {
-                if (this.mainUserEnjProfile.compatThreshold == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
+                if (this.mainUserEnjProfile.adjustedCompat == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
                     continue;
                 }
 
@@ -501,7 +510,7 @@ class DataManager {
                 const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
                 const actualRating = ratingInfo.actualRating;
                 const levelSkills = ratingInfo.skills2DArr;
-                const calculatedWeight = calculateWeight(adjustedEnjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.compatThreshold, this.mainUserEnjProfile);
+                const calculatedWeight = calculateWeight(enjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
                 this.addWeight(levelID, calculatedWeight, ratingInfo);
             }
         }

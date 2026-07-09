@@ -428,7 +428,7 @@ async function registerUserSubmissions(
         if (savedLevelInfo != null) {
             Object.assign(levelInfo, savedLevelInfo);
 
-        } else if (!skipAcquiringLevelInfo) {
+        } else {
             const levelInfoResponse = await requestLevelInfo(rating.l);
             const {actualRating: t, actualEnj: e, levelName: n, levelAuthor: a} = levelInfoResponse;
             Object.assign(levelInfo, {t, e, n, a});
@@ -439,9 +439,6 @@ async function registerUserSubmissions(
             }
 
             dataManager.addLevelInfoToCache(rating.l, levelInfo);
-
-        } else {
-            levelInfo.actualRating = rating.at;
 
         }
 
@@ -466,7 +463,7 @@ async function registerUserSubmissions(
 }
 
 /**
- * 
+ * uses gddl api directly to collect a user's submissions
  * @param {string} username 
  */
 async function registerUserSubmissionsGDDL(
@@ -543,7 +540,7 @@ async function registerUserSubmissionsGDDL(
 
     await Promise.allSettled(promiseArr);
 
-    console.log(`submission registration for ${username} finished using GDDL api: ${numSubmissionsRegistered} submissions registered`);
+    console.log(`submission registration for ${username}(${userID}) finished using GDDL api: ${numSubmissionsRegistered} submissions registered`);
 }
 
 async function registerAllOtherUserCommonSubmissions() {
@@ -669,13 +666,12 @@ async function registerAllRelevantLevelInfo(minTier = DEFAULT_MIN_TIER, maxTier 
 
 async function registerAllOtherUserSubmissions(
     minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, usersLimit = MAX_OTHER_USERS_TO_COLLECT_FROM, 
-    submissionsLimit = MAX_OTHER_USER_SUBMISSIONS, sortMethod = DEFAULT_OTHER_USER_SUBMISSIONS_SORT,
-    skipAcquiringLevelInfo = true
+    submissionsLimit = MAX_OTHER_USER_SUBMISSIONS, sortMethod = DEFAULT_OTHER_USER_SUBMISSIONS_SORT
 ) {
-    // this method won't work unless you've already pre-calculated compats and thresholds before
+    // this method won't work unless you've already pre-calculated compats and their adjustments before
     const otherUsersArr = dataManager.getMostCompatiblePlayers(usersLimit);
 
-    // use this method if calculating compats and thresholds is to be done later
+    // use this method if calculating compats and adjustments is to be done later
     // const otherUsersArr = dataManager.getMostCommonPlayers(usersLimit);
 
     const promiseArr = [];
@@ -683,6 +679,13 @@ async function registerAllOtherUserSubmissions(
         // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
 
         const sortDirection = "desc";
+
+        // don't use this; it takes WAY too long due to having to register whole profiles into backend
+        // which takes way longer than registering a level
+        // promiseArr.push(registerUserSubmissions(
+        //     otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
+        //     maxTier + TIER_RANGE_OFFSET, submissionsLimit, sortMethod, sortDirection
+        // ));
 
         promiseArr.push(registerUserSubmissionsGDDL(
             otherUserEnjProfile.userID, otherUserEnjProfile.username, true, minTier - TIER_RANGE_OFFSET,
@@ -701,7 +704,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     if (username === DEBUG_USERNAME) {
         dataManager.useDebugData();
 
-        dataManager.calculateCompatsAndThresholds();
+        dataManager.calculateAllCompats();
         dataManager.addAllWeights(minTier, maxTier);
         return dataManager.getMostRecommendedLevels();
     }
@@ -746,8 +749,8 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 3: calculating compats
     timestamp = Date.now();
-    dataManager.calculateCompatsAndThresholds();
-    console.log("calculated compatibilities and thresholds");
+    dataManager.calculateAllCompats();
+    console.log("calculated compatibilities and adjustments");
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 3 TIME ELAPSED: ${timeElapsedPerStage[3]}ms`);
 
