@@ -89,6 +89,7 @@ async function addLevelCard(levelID, levelWeightInfo) {
     const recInfo = levelCardFragment.querySelector(".rec-info");
     const trashRec = levelCardFragment.querySelector(".trash-rec");
     const showcase = levelCardFragment.querySelector(".showcase");
+    const gddlLink = levelCardFragment.querySelector(".gddl-link");
 
     const {
         actualRating: tierValue, 
@@ -121,6 +122,9 @@ async function addLevelCard(levelID, levelWeightInfo) {
     }
 
     recInfo.title = breakDownWeightCalculations(levelWeightInfo);
+    gddlLink.addEventListener("click", () => {
+        window.open(`https://gdladder.com/level/${levelID}`, "_blank");
+    })
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");

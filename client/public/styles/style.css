@@ -363,7 +363,7 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
-    "unused showcase"
+    "showcase gddl-link"
     "rec-info trash-rec";
   place-items: center;
   gap: 10px;
@@ -378,6 +378,11 @@ p {
   filter: invert(69%) sepia(25%) saturate(0%) hue-rotate(212deg) brightness(95%) contrast(90%);
 }
 
+.gddl-link:hover {
+  filter: invert(80%) sepia(44%) saturate(1820%) hue-rotate(358deg) brightness(105%) contrast(106%);
+  cursor: pointer;
+}
+
 .trash-rec {
   grid-area: trash-rec;
 }
@@ -388,6 +393,10 @@ p {
 
 .showcase {
   grid-area: showcase;
+}
+
+.gddl-link {
+  grid-area: gddl-link;
 }
 
 .level-name {
