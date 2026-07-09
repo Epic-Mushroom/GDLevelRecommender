@@ -44,7 +44,7 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const MAX_SKILL_MATCH_MULTIPLIER = 1.5;
+const MAX_SKILL_MATCH_MULTIPLIER = 2.5;
 // and this is the opposite
 const MAX_SKILL_CONTRAST_MULTIPLIER = 0.27;
 // multiplies this with perfect match multiplier and multiplies the reciprocal with perfect contrast multiplier
@@ -57,6 +57,74 @@ const STEP_3_WEIGHT_CONSTANT = 2.0;
 const STEP_3_WEIGHT_CALC_B = 0.6174;
 const STEP_3_WEIGHT_CALC_A = 0.2377;
 const STEP_3_WEIGHT_CALC_A2 = 0.588235294;
+
+/**
+ * 
+ * @param {[string, number][]} levelSkills 
+ * @param {EnjoymentProfile} mainUserProfile 
+ * @returns 
+ */
+function calculateSkillMultiplier(levelSkills, mainUserProfile) {
+    // if the level has no votes on skills, it shouldn't count for or against the weight regardless
+    if (levelSkills.length === 0) {
+        return 1.0;
+    }
+
+    const skillWeightPref = mainUserProfile?.skillWeightPref;
+    let modifiedUserSkills = [];
+    let modifiedLevelSkills = normalize2DArr(levelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+    switch (skillWeightPref) {
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.NONE:
+            break;
+
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.MATCH:
+            modifiedUserSkills = normalize2DArr(mainUserProfile?.skills2DArr, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            break;
+
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE:
+            modifiedUserSkills = normalize2DArr(mainUserProfile?.skills2DArr, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            break;
+
+        case EnjoymentProfile.SKILL_WEIGHT_PREF.LIKE:
+            modifiedUserSkills = normalize2DArr(mainUserProfile?.calculateLikedSkills(), SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            break;
+
+        default:
+            break;
+    }
+
+    let skillMultiplier = 1.0;
+    if (skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.NONE) {
+        // const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+        const userSkillsScore = scoreVector(modifiedUserSkills, modifiedLevelSkills, NUM_USER_SKILLS_TO_SCORE, NUM_LEVEL_SKILLS_TO_SCORE);
+
+        const maxMultiplier = ((mainUserProfile.skillWeightAggression) ?
+            (MAX_SKILL_MATCH_MULTIPLIER * SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_MATCH_MULTIPLIER
+        );
+        const minMultiplier = ((mainUserProfile.skillWeightAggression) ?
+            (MAX_SKILL_CONTRAST_MULTIPLIER / SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_CONTRAST_MULTIPLIER
+        );
+
+        if (skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE) {
+            if (userSkillsScore <= 0.5) {
+                skillMultiplier = adjustToRange(userSkillsScore, [0, 0.5], [minMultiplier, 1.0]);
+            } else {
+                skillMultiplier = adjustToRange(userSkillsScore, [0.5, 1], [1.0, maxMultiplier]);
+            }
+
+        } else {
+            if (userSkillsScore <= 0.5) {
+                skillMultiplier = adjustToRange(userSkillsScore, [0, 0.5], [maxMultiplier, 1.0]);
+            } else {
+                skillMultiplier = adjustToRange(userSkillsScore, [0.5, 1], [1.0, minMultiplier]);
+            }
+
+        }
+
+    }
+
+    return skillMultiplier;
+}
 
 /**
  * 
@@ -82,65 +150,9 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     cumulativeResult += step1Result * compatMultiplier
 
     // skill weighting here
-    const skillWeightPref = mainUserProfile?.skillWeightPref;
-    let modifiedUserSkills = [];
-    let modifiedLevelSkills = normalize2DArr(levelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-    switch (skillWeightPref) {
-        case EnjoymentProfile.SKILL_WEIGHT_PREF.NONE:
-            break;
-
-        case EnjoymentProfile.SKILL_WEIGHT_PREF.MATCH:
-            modifiedUserSkills = normalize2DArr(mainUserProfile?.skills2DArr, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-            break;
-
-        case EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE:
-            modifiedUserSkills = normalize2DArr(mainUserProfile?.skills2DArr, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-            break;
-
-        case EnjoymentProfile.SKILL_WEIGHT_PREF.LIKE:
-            modifiedUserSkills = normalize2DArr(mainUserProfile?.calculateLikedSkills(), SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-            break;
-
-        default:
-            break;
-    }
-
-    if (cumulativeResult > 0 && skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.NONE) {
-        // const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-        const userSkillsScore = scoreVector(modifiedUserSkills, modifiedLevelSkills, NUM_USER_SKILLS_TO_SCORE, NUM_LEVEL_SKILLS_TO_SCORE);
-        let skillMultiplier = 1.0;
-
-        const maxMultiplier = ((mainUserProfile.skillWeightAggression) ?
-            (MAX_SKILL_MATCH_MULTIPLIER * SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_MATCH_MULTIPLIER
-        );
-        const minMultiplier = ((mainUserProfile.skillWeightAggression) ?
-            (MAX_SKILL_CONTRAST_MULTIPLIER / SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_CONTRAST_MULTIPLIER
-        );
-
-        if (skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE) {
-            if (userSkillsScore <= 0.5) {
-                skillMultiplier = adjustToRange(userSkillsScore, [0, 0.5], [minMultiplier, 1.0]);
-            } else {
-                skillMultiplier = adjustToRange(userSkillsScore, [0.5, 1], [1.0, maxMultiplier]);
-            }
-
-        } else {
-            if (userSkillsScore <= 0.5) {
-                skillMultiplier = adjustToRange(userSkillsScore, [0, 0.5], [maxMultiplier, 1.0]);
-            } else {
-                skillMultiplier = adjustToRange(userSkillsScore, [0.5, 1], [1.0, minMultiplier]);
-            }
-
-        }
-
-        // if the level has no votes on skills, it shouldn't count for or against the weight regardless
-        if (levelSkills.length === 0) {
-            skillMultiplier = 1.0;
-        }
-
-        console.log(`   applied a skill multiplier of ${skillMultiplier} to this level (${cumulativeResult} -> ${cumulativeResult * skillMultiplier})`);
-        cumulativeResult *= skillMultiplier;
-    }
+    const skillMultiplier = calculateSkillMultiplier(levelSkills, mainUserProfile);
+    cumulativeResult *= skillMultiplier
+    console.log(`   applied a skill multiplier of ${skillMultiplier} to this level (${cumulativeResult} -> ${cumulativeResult * skillMultiplier})`);
 
     if (Math.round(rating) < minTier || Math.round(rating) > maxTier) {
         cumulativeResult *= 1.0 / 9999;

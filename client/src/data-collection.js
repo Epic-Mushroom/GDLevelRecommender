@@ -64,7 +64,7 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 40;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 44;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
@@ -669,8 +669,8 @@ async function registerAllOtherUserSubmissions(
 ) {
     // this method won't work unless you've already pre-calculated compats and their adjustments before
     // mixes most common players and most compatible players to get a more varied sample
-    const otherUsersSet = new Set(dataManager.getMostCommonPlayers(Math.floor(usersLimit * 0.6)));
-    const mostCompatible = dataManager.getMostCompatiblePlayers(usersLimit - Math.floor(usersLimit * 0.6));
+    const otherUsersSet = new Set(dataManager.getMostCommonPlayers(Math.floor(usersLimit * 0.2)));
+    const mostCompatible = dataManager.getMostCompatiblePlayers(usersLimit - Math.floor(usersLimit * 0.2));
     mostCompatible.forEach((otherUserProfile) => otherUsersSet.add(otherUserProfile));
 
     // use this method if calculating compats and adjustments is to be done later
