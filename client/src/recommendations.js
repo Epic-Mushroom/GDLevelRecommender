@@ -648,6 +648,13 @@ class DataManager {
             levelName: "Slaughterhouse",
             levelAuthor: "IcEDCave",
             skills2DArr: []
+        };
+        const DOESNT_EXIST = {
+            actualRating: 39,
+            actualEnj: 10,
+            levelName: "angelicide 6",
+            levelAuthor: "me",
+            skills2DArr: []
         }
 
         dataManager.addMainUserEnjRating(1, 3, CLUBSTEP);
@@ -671,6 +678,7 @@ class DataManager {
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, ETHEREAL_ARTIFICE); 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, NEXT_STAGE); 
         dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 27690100, 10, SLAUGHTERHOUSE); 
+        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 222222, 10, DOESNT_EXIST); 
     }
 }
 

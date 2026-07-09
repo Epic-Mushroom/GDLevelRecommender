@@ -247,6 +247,12 @@ export async function requestLevelInfo(levelID) {
     return response;
 }
 
+export async function requestLevelShowcaseGDDL(levelID) {
+    const response = await getAPIResponse(["level", levelID], {}, true);
+
+    return response.Showcase;
+}
+
 /**
  * 
  * @param {Array<number>} levelIDs 

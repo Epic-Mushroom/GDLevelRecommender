@@ -322,6 +322,10 @@ p {
   text-align: center;
 }
 
+.cursor-pointer:hover {
+  cursor: pointer;
+}
+
 #recommendations-container {
   width: 1300px;
   max-width: 80vw;

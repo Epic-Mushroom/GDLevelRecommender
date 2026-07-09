@@ -124,6 +124,22 @@ async function addLevelCard(levelID, levelWeightInfo) {
     recInfo.title = breakDownWeightCalculations(levelWeightInfo);
     gddlLink.addEventListener("click", () => {
         window.open(`https://gdladder.com/level/${levelID}`, "_blank");
+    });
+    dataCollection.requestLevelShowcaseGDDL(levelID).then((showcaseID) => {
+        if (showcaseID != null) {
+            showcase.addEventListener("click", () => {
+                window.open(`https://www.youtube.com/watch?v=${showcaseID}`, "_blank");
+            });
+            showcase.classList.toggle("cursor-pointer", true);
+
+        } else {
+            showcase.title = "No video was found for this level";
+
+        }
+        
+    }).catch((err) => {
+        showcase.title = "No video was found for this level";
+
     })
 
     recommendationsContainer.append(levelCardFragment);
