@@ -73,10 +73,6 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     // const step2WeightCalcX = (step1Result > 0) ? 0 : 1;
     // let cumulativeResult = step1Result + (-1) ** step2WeightCalcX * STEP_2_WEIGHT_CALC_M * (STEP_2_WEIGHT_CALC_N * adjustedCompat) ** STEP_2_WEIGHT_CALC_P + STEP_2_WEIGHT_CALC_B;
 
-    // if (rating < minTier || rating > maxTier) {
-    //     cumulativeResult -= 99999;
-    // }
-
     // new formula
     let cumulativeResult = 0;
     const step1Result = STEP_1_WEIGHT_CALC_A * (enjoyment ** 2) + STEP_1_WEIGHT_CALC_B2;
@@ -144,8 +140,8 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
         cumulativeResult *= skillMultiplier;
     }
 
-    if (rating < minTier || rating > maxTier) {
-        cumulativeResult -= 99999;
+    if (Math.round(rating) < minTier || Math.round(rating) > maxTier) {
+        cumulativeResult *= 1.0 / 9999;
     }
 
     return cumulativeResult;
@@ -504,7 +500,7 @@ class DataManager {
 
         // old calculation: dampened sum to prevent unpopularity bias
         // the problem with this is that it will depend on the order of the weights being added
-        const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
+        // const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
 
         // new calculation: should prevent both unpopularity and popularity bias
         // turns out that levels with 1 10/10 from a compatible user still get pushed to the top 
@@ -514,7 +510,7 @@ class DataManager {
         // const newWeight = newRawTotalWeight * 1.0 * (STEP_3_WEIGHT_CALC_B + STEP_3_WEIGHT_CALC_A * Math.log(newNumRatings)) / newNumRatings;
 
         // newer v2 calculation: uses a multiplier defined by exponential decay
-        // const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
+        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
 
         this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo});
 
