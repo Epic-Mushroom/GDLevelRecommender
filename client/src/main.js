@@ -1,5 +1,5 @@
 import * as dataCollection from "./data-collection.js";
-import {getNBest, purifyInt, reverseMap, sleep} from "../../utils.js";
+import {formatter, getNBest, purifyInt, reverseMap, sleep} from "../../utils.js";
 
 const CLIENT_TICK_DELAY = 50; // milliseconds
 
@@ -46,6 +46,26 @@ function errorMsg(message) {
     startAnimation(errorMessageText, "display-and-fade-out", true);
 }
 
+function breakDownWeightCalculations(levelWeightInfo) {
+    const numUsers = levelWeightInfo.numRatings;
+    const rawAvgWeight = levelWeightInfo.rawTotalWeight * 1.0 / numUsers;
+
+    const userCountMultiplier = levelWeightInfo.weight / rawAvgWeight;
+    const userCountPenalty = levelWeightInfo.weight - rawAvgWeight;
+
+    const compatWeight = rawAvgWeight / levelWeightInfo.skillMultiplier;
+    const skillWeight = rawAvgWeight - compatWeight;
+
+    const resultWeight = levelWeightInfo.weight;
+
+    return `Raw Weight: ${formatter.format(rawAvgWeight)}
+    Similiar Users Weight: ${formatter.format(compatWeight)}
+    Skill Weight: ${formatter.format(skillWeight)} (multiplier: ${formatter.format(levelWeightInfo.skillMultiplier)}x)
+User Count Penalty: ${formatter.format(userCountPenalty)} (${numUsers} users) (multiplier: ${formatter.format(userCountMultiplier)}x)
+
+Result Weight: ${formatter.format(resultWeight)}`;
+}
+
 /**
  * 
  * @param {number} levelID 
@@ -58,12 +78,17 @@ async function addLevelCard(levelID, levelWeightInfo) {
 
     const levelCardFragment = levelCardTemplate.content.cloneNode(true);
     const levelCard = levelCardFragment.querySelector(".level-card");
+
     const skillCard = levelCardFragment.querySelector(".skills-display");
     const levelName = levelCardFragment.querySelector(".level-name");
     const levelIDText = levelCardFragment.querySelector(".level-id");
     const authorName = levelCardFragment.querySelector(".author-name");
     const tier = levelCardFragment.querySelector(".tier");
     const enj = levelCardFragment.querySelector(".enjoyment");
+
+    const recInfo = levelCardFragment.querySelector(".rec-info");
+    const trashRec = levelCardFragment.querySelector(".trash-rec");
+    const showcase = levelCardFragment.querySelector(".showcase");
 
     const {
         actualRating: tierValue, 
@@ -94,6 +119,8 @@ async function addLevelCard(levelID, levelWeightInfo) {
         const author = levelCardFragment.querySelector(".author");
         author.style.setProperty("display", "none");
     }
+
+    recInfo.title = breakDownWeightCalculations(levelWeightInfo);
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");

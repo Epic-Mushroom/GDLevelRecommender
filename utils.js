@@ -1,4 +1,8 @@
-const MAX_BATCH_REQUEST_SIZE = 13;
+export const formatter = new Intl.NumberFormat("en-US", {
+    signDisplay: "always",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+});
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
