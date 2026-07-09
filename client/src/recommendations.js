@@ -44,13 +44,13 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const MAX_SKILL_MATCH_MULTIPLIER = 2.5;
+const MAX_SKILL_MATCH_MULTIPLIER = 1.6;
 // and this is the opposite
 const MAX_SKILL_CONTRAST_MULTIPLIER = 0.27;
 // multiplies this with perfect match multiplier and multiplies the reciprocal with perfect contrast multiplier
 // when trying to aggressively fit skills
 const SKILL_FIT_AGGRESSION_MULTIPLIER = 2.2;
-const NUM_USER_SKILLS_TO_SCORE = 5;
+const NUM_USER_SKILLS_TO_SCORE = null;
 const NUM_LEVEL_SKILLS_TO_SCORE = 3;
 // for use in modified average weight
 const STEP_3_WEIGHT_CONSTANT = 2.0;
@@ -153,7 +153,7 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     const skillMultiplier = calculateSkillMultiplier(levelSkills, mainUserProfile);
     const skillWeight = ((skillMultiplier - 1) * cumulativeResult);
     cumulativeResult += skillWeight;
-    console.log(`   applied a skill multiplier of ${skillMultiplier} (+${skillWeight}) to this level (${cumulativeResult} -> ${cumulativeResult + skillWeight})`);
+    // console.log(`   applied a skill multiplier of ${skillMultiplier} (+${skillWeight}) to this level (${cumulativeResult - skillWeight} -> ${cumulativeResult})`);
 
     if (Math.round(rating) < minTier || Math.round(rating) > maxTier) {
         cumulativeResult *= 1.0 / 999;
@@ -524,7 +524,10 @@ class DataManager {
         // const newWeight = newRawTotalWeight * 1.0 * (STEP_3_WEIGHT_CALC_B + STEP_3_WEIGHT_CALC_A * Math.log(newNumRatings)) / newNumRatings;
 
         // newer v2 calculation: uses a multiplier defined by exponential decay
-        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
+        //const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
+
+        // newer v3 calculation: see v2 but penalizes low common user count even more
+        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), (newNumRatings - 0.5)) + 1) / newNumRatings;
 
         this.levelWeightsMap.set(levelID, {
             rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, 
@@ -541,8 +544,8 @@ class DataManager {
                     continue;
                 }
 
-                console.log(`calculating weight of ${ratingInfo.levelName} by ${ratingInfo.levelAuthor}`);
-                console.log(`   old weight was ${this.levelWeightsMap.get(levelID)?.weight || 0}`);
+                // console.log(`calculating weight of ${ratingInfo.levelName} by ${ratingInfo.levelAuthor}`);
+                // console.log(`   old weight was ${this.levelWeightsMap.get(levelID)?.weight || 0}`);
 
                 const enjRating = ratingInfo.enjoyment;
                 const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
@@ -559,7 +562,7 @@ class DataManager {
     getMostRecommendedLevels(limit = 10, minTier, maxTier) {
         return getNBest(this.levelWeightsMap, limit, ([key, val]) => {
             return -this.levelWeightsMap.get(key).weight;
-        })
+        });
     }
 
     useDebugData() {
