@@ -151,14 +151,15 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
 
     // skill weighting here
     const skillMultiplier = calculateSkillMultiplier(levelSkills, mainUserProfile);
-    cumulativeResult *= skillMultiplier
-    console.log(`   applied a skill multiplier of ${skillMultiplier} to this level (${cumulativeResult} -> ${cumulativeResult * skillMultiplier})`);
+    const skillWeight = ((skillMultiplier - 1) * cumulativeResult);
+    cumulativeResult += skillWeight;
+    console.log(`   applied a skill multiplier of ${skillMultiplier} (+${skillWeight}) to this level (${cumulativeResult} -> ${cumulativeResult + skillWeight})`);
 
     if (Math.round(rating) < minTier || Math.round(rating) > maxTier) {
-        cumulativeResult *= 1.0 / 9999;
+        cumulativeResult *= 1.0 / 999;
     }
 
-    return cumulativeResult;
+    return {totalWeight: cumulativeResult, skillMultiplier: skillMultiplier};
 }
 
 class DataError extends Error {
@@ -415,7 +416,7 @@ class DataManager {
         /**
          * level ID's of possible recommendations mapped to their calculated weight, number of enj ratings
          * used in the calculation of the weight, and level info
-         * @type {Map<number, {rawTotalWeight: number, weight: number, numRatings: number, levelInfo: {
+         * @type {Map<number, {rawTotalWeight: number, weight: number, numRatings: number, skillMultiplier: number, levelInfo: {
          *          actualRating: number, actualEnj: number, levelName: string, levelAuthor: string, skills2DArr: [string, number][]
          *        }}>}
          */
@@ -502,14 +503,13 @@ class DataManager {
         });
     }
 
-    addWeight(levelID, weight, levelInfo) {
+    addWeight(levelID, weightDetails, levelInfo) {
         const oldWeightData = this.levelWeightsMap.get(levelID);
 
         const oldRawTotalWeight = oldWeightData?.rawTotalWeight || 0;
-        const oldWeight = oldWeightData?.weight || 0;
         const oldNumRatings = oldWeightData?.numRatings || 0;
 
-        const newRawTotalWeight = oldRawTotalWeight + weight;
+        const newRawTotalWeight = oldRawTotalWeight + weightDetails.totalWeight;
         const newNumRatings = oldNumRatings + 1;
 
         // old calculation: dampened sum to prevent unpopularity bias
@@ -526,7 +526,10 @@ class DataManager {
         // newer v2 calculation: uses a multiplier defined by exponential decay
         const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
 
-        this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo});
+        this.levelWeightsMap.set(levelID, {
+            rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, 
+            skillMultiplier: weightDetails.skillMultiplier, levelInfo: levelInfo
+        });
 
         return newWeight;
     }
@@ -545,8 +548,10 @@ class DataManager {
                 const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
                 const actualRating = ratingInfo.actualRating;
                 const levelSkills = ratingInfo.skills2DArr;
-                const calculatedWeight = calculateWeight(adjustedEnjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
-                this.addWeight(levelID, calculatedWeight, ratingInfo);
+
+                const calculatedWeightDetails = calculateWeight(adjustedEnjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
+
+                this.addWeight(levelID, calculatedWeightDetails, ratingInfo);
             }
         }
     }

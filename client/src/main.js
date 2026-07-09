@@ -46,7 +46,16 @@ function errorMsg(message) {
     startAnimation(errorMessageText, "display-and-fade-out", true);
 }
 
-async function addLevelCard(levelID, levelInfo) {
+/**
+ * 
+ * @param {number} levelID 
+ * @param {{rawTotalWeight: number, weight: number, numRatings: number, skillMultiplier: number, levelInfo: {
+ *          actualRating: number, actualEnj: number, levelName: string, levelAuthor: string, skills2DArr: [string, number][]
+ *        }}} levelWeightInfo 
+ */
+async function addLevelCard(levelID, levelWeightInfo) {
+    const levelInfo = levelWeightInfo.levelInfo;
+
     const levelCardFragment = levelCardTemplate.content.cloneNode(true);
     const levelCard = levelCardFragment.querySelector(".level-card");
     const skillCard = levelCardFragment.querySelector(".skills-display");
@@ -105,7 +114,7 @@ async function displayRecommendations(username, minTier, maxTier) {
     await sleep(LEVEL_CARD_DELAY);
 
     for (const [levelID, levelWeightInfo] of levelRecs) {
-        addLevelCard(levelID, levelWeightInfo.levelInfo);
+        addLevelCard(levelID, levelWeightInfo);
         console.log(`creating card for level ID: ${levelID}`);
         await sleep(LEVEL_CARD_DELAY);
     }

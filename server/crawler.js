@@ -6,7 +6,7 @@ import {sleep} from "../utils.js";
 
 const ENJ_COUNT_DIFFERENCE_PERCENT_THRESHOLD = 10.0; // only if the enj counts between db and actual differ by this percent will the level be updated
 
-async function crawlPage(pageNum) {
+async function crawlLevelPage(pageNum) {
     const response = await gddlAPI.getAPIResponse(["level", "search"], {
         limit: 25,
         page: pageNum,
@@ -53,9 +53,9 @@ async function crawlPage(pageNum) {
     return response.levels.length !== 0;
 }
 
-async function crawl(startPage = 0) {
+async function crawlLevels(startPage = 0) {
     for (let pageNum = startPage; pageNum < 199999; pageNum++) {
-        if (!(await crawlPage(pageNum))) {
+        if (!(await crawlLevelPage(pageNum))) {
             break;
         }
 
@@ -67,4 +67,4 @@ async function crawl(startPage = 0) {
     process.exit(0);
 }
 
-await crawl(240);
+await crawlLevels(240);

@@ -347,6 +347,44 @@ p {
 
 }
 
+.level-card-widgets {
+  position: absolute;
+  right: 0%;
+  bottom: 0%;
+
+  margin-right: 15px;
+  margin-bottom: 15px;
+
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "unused showcase"
+    "rec-info trash-rec";
+  place-items: center;
+  gap: 10px;
+
+}
+
+.trash-rec:hover, .showcase:hover {
+  filter: invert(21%) sepia(60%) saturate(7473%) hue-rotate(354deg) brightness(95%) contrast(124%);
+}
+
+.rec-info:hover {
+  filter: invert(69%) sepia(25%) saturate(0%) hue-rotate(212deg) brightness(95%) contrast(90%);
+}
+
+.trash-rec {
+  grid-area: trash-rec;
+}
+
+.rec-info {
+  grid-area: rec-info;
+}
+
+.showcase {
+  grid-area: showcase;
+}
+
 .level-name {
   margin-bottom: 0px;
 }
