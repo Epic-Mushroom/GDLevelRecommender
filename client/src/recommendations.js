@@ -41,7 +41,7 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const MAX_SKILL_MATCH_MULTIPLIER = 1.4;
+const MAX_SKILL_MATCH_MULTIPLIER = 3.0;
 // and this is the opposite
 const MAX_SKILL_CONTRAST_MULTIPLIER = 0.27;
 // multiplies this with perfect match multiplier and multiplies the reciprocal with perfect contrast multiplier
@@ -483,7 +483,7 @@ class DataManager {
         const newNumRatings = oldNumRatings + 1;
 
         // old calculation: dampened sum to prevent unpopularity bias
-        // const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
+        const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
 
         // new calculation: should prevent both unpopularity and popularity bias
         // const newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
@@ -492,7 +492,7 @@ class DataManager {
         // const newWeight = newRawTotalWeight * 1.0 * (STEP_3_WEIGHT_CALC_B + STEP_3_WEIGHT_CALC_A * Math.log(newNumRatings)) / newNumRatings;
 
         // newer v2 calculation: uses a multiplier defined by exponential decay
-        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
+        // const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
 
         this.levelWeightsMap.set(levelID, {rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, levelInfo: levelInfo});
 
@@ -510,7 +510,7 @@ class DataManager {
                 const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
                 const actualRating = ratingInfo.actualRating;
                 const levelSkills = ratingInfo.skills2DArr;
-                const calculatedWeight = calculateWeight(enjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
+                const calculatedWeight = calculateWeight(adjustedEnjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
                 this.addWeight(levelID, calculatedWeight, ratingInfo);
             }
         }

@@ -64,12 +64,12 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 28;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 40;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 5;
 // up to [this value] levels from other users will be tracked
-const MAX_OTHER_USER_SUBMISSIONS = 50;
+const MAX_OTHER_USER_SUBMISSIONS = 25;
 // for sorting when gathering submissions from other users' pages
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT = "levelRating";
 const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
@@ -428,7 +428,9 @@ async function registerUserSubmissions(
         if (savedLevelInfo != null) {
             Object.assign(levelInfo, savedLevelInfo);
 
-        } else {
+        }
+
+        if (isOther) {
             const levelInfoResponse = await requestLevelInfo(rating.l);
             const {actualRating: t, actualEnj: e, levelName: n, levelAuthor: a} = levelInfoResponse;
             Object.assign(levelInfo, {t, e, n, a});
@@ -440,9 +442,6 @@ async function registerUserSubmissions(
 
             dataManager.addLevelInfoToCache(rating.l, levelInfo);
 
-        }
-
-        if (isOther) {
             dataManager.addOtherUserEnjRating(
                 userID, username, rating.l, rating.e, levelInfo
             );
@@ -505,7 +504,7 @@ async function registerUserSubmissionsGDDL(
                     dataManager.addLevelInfoToCache(levelID, levelInfo, true);
 
                 } else {
-                    levelInfo.skills2DArr = dataManager.cachedLevelInfo.get(levelID).skills2DArr;
+                    levelInfo.skills2DArr = dataManager.cachedLevelInfo.get(levelID)?.skills2DArr;
 
                 }
 
@@ -532,8 +531,8 @@ async function registerUserSubmissionsGDDL(
     await registration(response); // register first page of submissions
     const maxPageNum = Math.ceil(Math.min(response.total, limit) * 1.0 / NUM_SUBMISSIONS_PER_USER_PAGE) - 1;
 
-    // add concurrency here!!!!!!!!
     const promiseArr = [];
+    // starts iterating pages from the other end
     for (let pageNum = 1; pageNum <= maxPageNum; pageNum++) {
         promiseArr.push(registerPage(userID, minTier, maxTier, pageNum, sortMethod, sortDirection, isOther));
     }
@@ -669,13 +668,16 @@ async function registerAllOtherUserSubmissions(
     submissionsLimit = MAX_OTHER_USER_SUBMISSIONS, sortMethod = DEFAULT_OTHER_USER_SUBMISSIONS_SORT
 ) {
     // this method won't work unless you've already pre-calculated compats and their adjustments before
-    const otherUsersArr = dataManager.getMostCompatiblePlayers(usersLimit);
+    // mixes most common players and most compatible players to get a more varied sample
+    const otherUsersSet = new Set(dataManager.getMostCommonPlayers(Math.floor(usersLimit * 0.6)));
+    const mostCompatible = dataManager.getMostCompatiblePlayers(usersLimit - Math.floor(usersLimit * 0.6));
+    mostCompatible.forEach((otherUserProfile) => otherUsersSet.add(otherUserProfile));
 
     // use this method if calculating compats and adjustments is to be done later
     // const otherUsersArr = dataManager.getMostCommonPlayers(usersLimit);
 
     const promiseArr = [];
-    for (const otherUserEnjProfile of otherUsersArr) {
+    for (const otherUserEnjProfile of otherUsersSet) {
         // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
 
         const sortDirection = "desc";
