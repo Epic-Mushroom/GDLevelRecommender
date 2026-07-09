@@ -1,4 +1,4 @@
-import {sleep, getNSmallest, getRandomInt} from "../utils.js";
+import {sleep, getNBest, getRandomInt} from "../utils.js";
 
 export const GDDL_API_URL = "https://gdladder.com/api";
 export const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";
@@ -178,7 +178,7 @@ export async function getLevelSkills(levelID, limit = null) {
         if (limit == null) {
             return skillsMap;
         } else {
-            return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+            return getNBest(skillsMap, limit, ([key, val]) => -val);
         }
 
     } catch (err) {

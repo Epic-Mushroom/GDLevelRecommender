@@ -23,13 +23,14 @@ export function getRandomInt(min, max) {
 }
 
 /**
+ * gets the first n elements of an iterable sorted by a function (without actually sorting the iterable)
  * @template T
  * @param {Iterable<T>} iterable 
  * @param {number} n
  * @param {function(T): number} func a function that is called on each element to use the result as the basis for sorting
  * @returns {T[]}
  */
-export function getNSmallest(iterable, n, func = (a) => a) {
+export function getNBest(iterable, n, func = (a) => a) {
     const resultArr = [];
     let largestElem = null;
     let largestBasis = null;
@@ -110,42 +111,6 @@ export async function measureTime(operation, paramsArr, name = null) {
 }
 
 /**
- * both arrays must have the same size
- * @param {Array<number>} ratings1 
- * @param {Array<number>} ratings2 
- * @returns 
- */
-export function pearson(ratings1, ratings2) {
-    const n = ratings1.length;
-    if (n < 2 || n !== ratings2.length) {
-        return 0; 
-    }
-
-    const avg1 = ratings1.reduce((sum, val) => sum + val, 0) / n;
-    const avg2 = ratings2.reduce((sum, val) => sum + val, 0) / n;
-
-    let numerator = 0;
-    let sumOfSquares1 = 0;
-    let sumOfSquares2 = 0;
-
-    for (let i = 0; i < n; i++) {
-        const difference1 = ratings1[i] - avg1;
-        const difference2 = ratings2[i] - avg2;
-
-        numerator += difference1 * difference2;
-        sumOfSquares1 += difference1 * difference1;
-        sumOfSquares2 += difference2 * difference2;
-    }
-
-    // need to check if any of the sums are 0, or else we would divide by 0
-    if (sumOfSquares1 === 0 || sumOfSquares2 === 0) {
-        return 0;
-    } 
-
-    return numerator * 1.0 / Math.sqrt(sumOfSquares1 * sumOfSquares2);
-}
-
-/**
  * does not mutate the original array
  * @param {[*, number][]} arr2D 
  */
@@ -188,8 +153,44 @@ export function adjustToRange(value, oldRange, newRange) {
     const oldRangeLength = oldRange[1] - oldRange[0];
     const newRangeLength = newRange[1] - newRange[0];
 
-    const rangeProportion = (oldRangeLength === 0) ? 0 : ((value - oldRange[0]) * 1.0 / oldRangeLength);
+    const rangeProportion = (oldRangeLength === 0) ? 1 : ((value - oldRange[0]) * 1.0 / oldRangeLength);
     return newRange[0] + rangeProportion * newRangeLength;
+}
+
+/**
+ * both arrays must have the same size
+ * @param {Array<number>} values1 
+ * @param {Array<number>} values2 
+ * @returns 
+ */
+export function pearsonSimilarity(values1, values2) {
+    const n = values1.length;
+    if (n < 2 || n !== values2.length) {
+        return 0; 
+    }
+
+    const avg1 = values1.reduce((sum, val) => sum + val, 0) / n;
+    const avg2 = values2.reduce((sum, val) => sum + val, 0) / n;
+
+    let numerator = 0;
+    let sumOfSquares1 = 0;
+    let sumOfSquares2 = 0;
+
+    for (let i = 0; i < n; i++) {
+        const difference1 = values1[i] - avg1;
+        const difference2 = values2[i] - avg2;
+
+        numerator += difference1 * difference2;
+        sumOfSquares1 += difference1 * difference1;
+        sumOfSquares2 += difference2 * difference2;
+    }
+
+    // need to check if any of the sums are 0, or else we would divide by 0
+    if (sumOfSquares1 === 0 || sumOfSquares2 === 0) {
+        return 0;
+    } 
+
+    return numerator * 1.0 / Math.sqrt(sumOfSquares1 * sumOfSquares2);
 }
 
 /**
@@ -214,4 +215,44 @@ export function cosineSimilarity(arr2D1, arr2D2, magnitude1, magnitude2) {
     }
 
     return dotProduct * 1.0 / (magnitude1 * magnitude2);
+}
+
+/**
+ * gives a 2D array a score depending on whether or not the values (index 1 elements) have a higher ratio than
+ * the respective values in the rubric array
+ * @param {*} arr2D 
+ * @param {*} rubricArr2D 
+ * @param {*} maxNumRubricItems how many items from the rubric to consider, will pick the highest ratio rubric items
+ * @param {*} leniencyRange if a value's ratio from the input is less than the corresponding rubric ratio but falls within
+ *                          the leniency range, will not be penalized
+ */
+export function scoreVector(arr2D, rubricArr2D, maxNumRubricItems, leniencyRange = 0.2) {
+    // ratio is out of the input array's highest value
+    const arrRangeEnd = Math.max(...arr2D.map(keyValPair => keyValPair[1]));
+    const arrRatios2D = arr2D.map(([key, val]) => [key, adjustToRange(val, [0, arrRangeEnd], [0.0, 1.0])]);
+    const arrRatiosMap = new Map(arrRatios2D);
+
+    // ratio is out of the sum of values
+    const rubricRangeSum = rubricArr2D.map(keyValPair => keyValPair[1]).reduce((sum, val) => sum + val, 0);
+    const rubricRatios2D = rubricArr2D.map(([key, val]) => [key, adjustToRange(val, [0, rubricRangeSum], [0.0, 1.0])]);
+
+    const filteredRubricRatios2D = getNBest(rubricRatios2D, maxNumRubricItems, ([key, val]) => -val);
+
+    const [minScore, maxScore] = [-maxNumRubricItems, maxNumRubricItems];
+
+    let score = 0;
+    for (const [key, rubricRatio] of filteredRubricRatios2D) {
+        const arrRatio = arrRatiosMap.get(key) || 0;
+
+        if (arrRatio >= rubricRatio) {
+            score += 1;
+
+        } else if (arrRatio < rubricRatio - leniencyRange) {
+            score -= 1;
+            
+        }
+    }
+
+    return adjustToRange(score, [minScore, maxScore], [0, 1]);
+
 }

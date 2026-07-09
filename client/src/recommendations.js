@@ -1,4 +1,7 @@
-import {getRandomInt, getNSmallest, pearson, normalize2DArr, adjustToRange, invert2DArr, cosineSimilarity} from "../../utils.js";
+import {
+    getRandomInt, getNBest, pearsonSimilarity, normalize2DArr, 
+    adjustToRange, invert2DArr, cosineSimilarity, scoreVector
+} from "../../utils.js";
 
 const DEFAULT_USER_ID = 92;
 const DEFAULT_USERNAME = "EpicMushroom";
@@ -21,7 +24,7 @@ const MAX_COMPAT = BASE_COMPAT * HIGH_NUM_COMMON_LEVELS_MULTIPLIER;
 const STEP_1_WEIGHT_CALC_B = -500;
 const STEP_1_WEIGHT_CALC_M = 100;
 const STEP_1_WEIGHT_CALC_A = 5;
-const STEP_1_WEIGHT_CALC_B2 = -200;
+const STEP_1_WEIGHT_CALC_B2 = 0;
 // OLD step 2 weight calc formula: (-1)^X * M * (N * adjustedCompat)^P + B
 // X = 0 if step 1's weight > 0, X = 1 otherwise
 // add step 2 to step 1
@@ -93,7 +96,7 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
             break;
 
         case EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE:
-            modifiedUserSkills = normalize2DArr(invert2DArr(mainUserProfile?.skills2DArr), SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+            modifiedUserSkills = normalize2DArr(mainUserProfile?.skills2DArr, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
             break;
 
         case EnjoymentProfile.SKILL_WEIGHT_PREF.LIKE:
@@ -105,7 +108,8 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     }
 
     if (cumulativeResult > 0 && skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.NONE) {
-        const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+        // const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
+        const userSkillsScore = scoreVector(modifiedUserSkills, modifiedLevelSkills, 3);
         let skillMultiplier = 1.0;
 
         const maxMultiplier = ((mainUserProfile.skillWeightAggression) ?
@@ -115,12 +119,28 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
             (MAX_SKILL_CONTRAST_MULTIPLIER / SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_CONTRAST_MULTIPLIER
         );
 
-        if (cosineSim <= 0.707) {
-            skillMultiplier = adjustToRange(cosineSim, [0, 0.707], [minMultiplier, 1.0]);
+        if (skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.OPPOSITE) {
+            if (userSkillsScore <= 0.5) {
+                skillMultiplier = adjustToRange(userSkillsScore, [0, 0.5], [minMultiplier, 1.0]);
+            } else {
+                skillMultiplier = adjustToRange(userSkillsScore, [0.5, 1], [1.0, maxMultiplier]);
+            }
+
         } else {
-            skillMultiplier = adjustToRange(cosineSim, [0.707, 1], [1.0, maxMultiplier]);
+            if (userSkillsScore <= 0.5) {
+                skillMultiplier = adjustToRange(userSkillsScore, [0, 0.5], [maxMultiplier, 1.0]);
+            } else {
+                skillMultiplier = adjustToRange(userSkillsScore, [0.5, 1], [1.0, minMultiplier]);
+            }
+
         }
 
+        // if the level has no votes on skills, it shouldn't count for or against the weight regardless
+        if (levelSkills.length === 0) {
+            skillMultiplier = 1.0;
+        }
+
+        console.log(`   applied a skill multiplier of ${skillMultiplier} to this level (${cumulativeResult} -> ${cumulativeResult * skillMultiplier})`);
         cumulativeResult *= skillMultiplier;
     }
 
@@ -315,7 +335,7 @@ export class EnjoymentProfile {
             return null;
         }
 
-        const pearsonCoeff = pearson(thisUserEnjoymentArr, mainUserEnjoymentArr);
+        const pearsonCoeff = pearsonSimilarity(thisUserEnjoymentArr, mainUserEnjoymentArr);
 
         this.compat = ((numCommonLevels >= MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER) ? HIGH_NUM_COMMON_LEVELS_MULTIPLIER : 1.0) * totalCompat / numCommonLevels;
         return this.compat;
@@ -447,13 +467,13 @@ class DataManager {
      * @param {number} limit 
      */
     getMostCommonPlayers(limit) {
-        return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
+        return getNBest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             return -1 * a.numCommonLevels;
         });
     }
 
     getMostCompatiblePlayers(limit = 10, minRatings = 1) {
-        return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
+        return getNBest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             if (a.adjustedCompat == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
@@ -463,7 +483,7 @@ class DataManager {
     }
 
     getLeastCompatiblePlayers(limit = 10, minRatings = 1) {
-        return getNSmallest(this.otherUserEnjProfileMap.values(), limit, (a) => {
+        return getNBest(this.otherUserEnjProfileMap.values(), limit, (a) => {
             if (a.adjustedCompat == null || a.ratingMap.size < minRatings) {
                 return Infinity;
             }
@@ -483,9 +503,11 @@ class DataManager {
         const newNumRatings = oldNumRatings + 1;
 
         // old calculation: dampened sum to prevent unpopularity bias
+        // the problem with this is that it will depend on the order of the weights being added
         const newWeight = oldWeight + (weight * (1.0 / Math.sqrt(newNumRatings)));
 
         // new calculation: should prevent both unpopularity and popularity bias
+        // turns out that levels with 1 10/10 from a compatible user still get pushed to the top 
         // const newWeight = newRawTotalWeight / (newNumRatings + STEP_3_WEIGHT_CONSTANT);
 
         // newer calculation: uses a logarithmic multiplier 
@@ -506,6 +528,9 @@ class DataManager {
                     continue;
                 }
 
+                console.log(`calculating weight of ${ratingInfo.levelName} by ${ratingInfo.levelAuthor}`);
+                console.log(`   old weight was ${this.levelWeightsMap.get(levelID)?.weight || 0}`);
+
                 const enjRating = ratingInfo.enjoyment;
                 const adjustedEnjRating = otherUserEnjProfile.getAdjustedEnjoyment(enjRating, this.mainUserEnjProfile);
                 const actualRating = ratingInfo.actualRating;
@@ -517,13 +542,13 @@ class DataManager {
     }
 
     getMostRecommendedLevels(limit = 10, minTier, maxTier) {
-        return getNSmallest(this.levelWeightsMap, limit, ([key, val]) => {
+        return getNBest(this.levelWeightsMap, limit, ([key, val]) => {
             return -this.levelWeightsMap.get(key).weight;
         })
     }
 
     useDebugData() {
-        dataManager.reset();
+        this.reset();
 
         dataManager.mainUserEnjProfile.setUserID(92);
         dataManager.mainUserEnjProfile.setUsername("diffieHellmanSpongebob93229"); 

@@ -1,5 +1,5 @@
 import * as dataCollection from "./data-collection.js";
-import {getNSmallest, purifyInt, reverseMap, sleep} from "../../utils.js";
+import {getNBest, purifyInt, reverseMap, sleep} from "../../utils.js";
 
 const CLIENT_TICK_DELAY = 50; // milliseconds
 
@@ -67,7 +67,7 @@ async function addLevelCard(levelID, levelInfo) {
     levelIDText.textContent = levelID;
 
     const mapToSkillName = reverseMap(dataCollection.SKILLS_MAPPING);
-    const top3Skills = getNSmallest(skillsArr, 3, (kvp) => -kvp[1]);
+    const top3Skills = getNBest(skillsArr, 3, (kvp) => -kvp[1]);
     let skillsString = top3Skills.map(elem => mapToSkillName.get(elem[0])).join(", ");
 
     if (skillsString === "") {

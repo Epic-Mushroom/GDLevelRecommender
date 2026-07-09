@@ -1,6 +1,6 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
-import {getRandomInt, getNSmallest, sleep, chunkArray, measureTime, normalize2DArr} from "../../utils.js";
+import {getRandomInt, getNBest, sleep, chunkArray, measureTime, normalize2DArr} from "../../utils.js";
 
 const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";// db that contains only necessary data for this site
 const GDDL_API_URL = "https://gdladder.com/api";
@@ -275,18 +275,18 @@ export async function requestLevelInfoBatch(levelIDs) {
     return responseArr;
 }
 
-// async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
-//     const response = await getAPIResponse(["level", levelID, "submissions"], {
-//         sort: DEFAULT_SUBMISSIONS_SORT,
-//         sortDirection: sortDirection,
-//         twoPlayer: false,
-//         progressFilter: "victors",
-//         limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
-//         page: pageNum
-//     }, true);
+async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
+    const response = await getAPIResponse(["level", levelID, "submissions"], {
+        sort: DEFAULT_SUBMISSIONS_SORT,
+        sortDirection: sortDirection,
+        twoPlayer: false,
+        progressFilter: "victors",
+        limit: NUM_SUBMISSIONS_PER_LEVEL_PAGE,
+        page: pageNum
+    }, true);
 
-//     return response;
-// }
+    return response;
+}
 
 async function requestLevelSubmissions(levelID) {
     const response = await getAPIResponse(["level", levelID], {});
@@ -349,7 +349,7 @@ export async function getLevelSkillsGDDL(levelID, limit = null) {
         if (limit == null) {
             return Array.from(skillsMap);
         } else {
-            return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+            return getNBest(skillsMap, limit, ([key, val]) => -val);
         }
 
     } catch (err) {
@@ -382,7 +382,7 @@ export async function getLevelSkills(levelID, limit = null, APIResponse = null) 
         if (limit == null) {
             return Array.from(skillsMap);
         } else {
-            return getNSmallest(skillsMap, limit, ([key, val]) => -val);
+            return getNBest(skillsMap, limit, ([key, val]) => -val);
         }
 
     } catch (err) {
@@ -552,7 +552,7 @@ async function registerAllOtherUserCommonSubmissions() {
     const promiseArr = [];
 
     // top MAX_USER_LEVELS_TOTAL levels from the main user sorted by their enjoyment
-    const filteredLevelIDs = getNSmallest(Array.from(dataManager.mainUserEnjProfile.ratingMap.keys()), MAX_USER_LEVELS_TOTAL, (levelID) => {
+    const filteredLevelIDs = getNBest(Array.from(dataManager.mainUserEnjProfile.ratingMap.keys()), MAX_USER_LEVELS_TOTAL, (levelID) => {
         return -dataManager.mainUserEnjProfile.ratingMap.get(levelID).enjoyment;
     });
 
@@ -630,7 +630,7 @@ async function registerAllRelevantLevelInfo(minTier = DEFAULT_MIN_TIER, maxTier 
         );
 
         // filter only the highest enjoyment rating levels from each user
-        const filteredRatingsArr = getNSmallest(ratingsArr, MAX_OTHER_USER_SUBMISSIONS, (ratingInfo) => -ratingInfo.e);
+        const filteredRatingsArr = getNBest(ratingsArr, MAX_OTHER_USER_SUBMISSIONS, (ratingInfo) => -ratingInfo.e);
 
         for (const ratingInfo of filteredRatingsArr) {
             const levelID = ratingInfo.l;
@@ -729,6 +729,8 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log(`set ${foundUsername}'s enj profile as the main enj profile`);
 
     getUserSkillsGDDL(userID).then((userSkills) => {
+        // PRONE TO RACE CONDITION IF SOMEHOW THIS TAKES UNTIL WEIGHT CALC STAGE TO FINISH
+        // THIS VERY LIKELY WON'T HAPPEN THO
         dataManager.mainUserEnjProfile.setSkills(userSkills);
         console.log(`obtained user's skills for ${foundUsername}`);
     });
