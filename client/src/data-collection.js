@@ -699,7 +699,7 @@ async function registerAllOtherUserSubmissions(
 
 }
 
-export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER) {
+export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, maxTier = DEFAULT_MAX_TIER, skillWeightPref = recs.EnjoymentProfile.SKILL_WEIGHT_PREF.MATCH) {
     // index is the stage
     const timeElapsedPerStage = [];
 
@@ -726,6 +726,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     }
 
     dataManager.mainUserEnjProfile = new recs.EnjoymentProfile(userID, foundUsername, false);
+    dataManager.mainUserEnjProfile.skillWeightPref = skillWeightPref;
     console.log(`set ${foundUsername}'s enj profile as the main enj profile`);
 
     getUserSkillsGDDL(userID).then((userSkills) => {

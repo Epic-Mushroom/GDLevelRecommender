@@ -559,7 +559,7 @@ class DataManager {
         }
     }
 
-    getMostRecommendedLevels(limit = 10, minTier, maxTier) {
+    getMostRecommendedLevels(limit = 9, minTier, maxTier) {
         return getNBest(this.levelWeightsMap, limit, ([key, val]) => {
             return -this.levelWeightsMap.get(key).weight;
         });

@@ -108,7 +108,7 @@ p {
 
 #app {
   width: 100vw;
-  max-width: 100vw;
+  max-width: 100%;
   margin: 0 auto;
   text-align: center;
   border-inline: 1px solid var(--border);
@@ -118,7 +118,7 @@ p {
   gap: 15px;
   box-sizing: border-box;
 
-  padding: 20px 0px;
+  padding: 10px 0px;
   background: linear-gradient(to right, var(--gradient-start-color), var(--gradient-end-color) var(--gradient-midpoint));
 }
 
@@ -231,15 +231,15 @@ p {
 }
 
 .title-text {
-  font-size: 120px;
-  line-height: 167%;
+  font-size: 82px;
+  line-height: 160%;
 
   font-family: "Milker", var(--sans);
 }
 
 .splash-text {
-  color: yellow;
-  font-size: 150%;
+  color: rgb(255, 255, 183);
+  font-size: 130%;
   line-height: 140%;
 }
 
@@ -292,6 +292,11 @@ p {
   background-color: #5a6e7441;
 }
 
+.help-text {
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
 .text-field {
   height: 30px;
 }
@@ -322,9 +327,9 @@ p {
   max-width: 80vw;
   display: none;
 
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-areas:
-    "title title";
+    "title title title";
   place-items: center;
 }
 
@@ -337,8 +342,8 @@ p {
 }
 
 .level-card {
-  width: 640px;
-  height: 295px;
+  width: 500px;
+  height: 250px;
 
   gap: 4px;
 
@@ -399,7 +404,7 @@ p {
 }
 
 .rating-value {
-  padding: 15px;
+  padding: 12px;
 }
 
 .skills-display {

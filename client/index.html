@@ -50,8 +50,18 @@
                     <label for="max-tier-field">to</label>
                     <input type="text" id="max-tier-field" name="max-tier" class="text-field small-text-field">
                 </div>
-                <div class="username"><label for="username-field">GDDL Username:</label>
-                <input type="text" id="username-field" name="username" class="text-field large-text-field"></div>
+
+                <div class="username">
+                    <label for="username-field">GDDL Username:</label>
+                    <input type="text" id="username-field" name="username" class="text-field large-text-field">
+                </div>
+
+                <div class="skillset-options horizontal-flex">
+                    <label for="match-skills" class="help-text" title="Attempts to recommend levels whose tags match the user's skillset">
+                        Match user skillset?
+                    </label>
+                    <input type="checkbox" id="match-skills" name="match-skills" checked>
+                </div>
                 
                 <button type="submit" id="submit-button" class="blending-shadow glass">Go</button>
             </form>

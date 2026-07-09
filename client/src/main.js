@@ -126,12 +126,12 @@ async function addLevelCard(levelID, levelWeightInfo) {
     startAnimation(levelCard, "slide-right-and-fade-in");
 }
 
-async function displayRecommendations(username, minTier, maxTier) {
+async function displayRecommendations(username, minTier, maxTier, skillWeightPref) {
     dataCollection.resetDataManager();
     recommendationsContainer.style.setProperty("display", "none");
     recommendationsContainer.replaceChildren();
 
-    const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier);
+    const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier, skillWeightPref);
     recommendationsContainer.style.setProperty("display", "grid");
 
     const h2 = document.createElement("h2");
@@ -156,7 +156,8 @@ function purifyFormData(formData) {
     const purifiedData = {
         minTier: dataCollection.DEFAULT_MIN_TIER,
         maxTier: dataCollection.DEFAULT_MAX_TIER,
-        username: ""
+        username: "",
+        skillWeightPref: "MATCH"
     }
 
     purifiedData.username = formData.get("username").trim();
@@ -168,6 +169,14 @@ function purifyFormData(formData) {
 
     purifiedData.minTier = purifyInt(formData.get("min-tier"), dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
     purifiedData.maxTier = purifyInt(formData.get("max-tier"), dataCollection.DEFAULT_MAX_TIER, dataCollection.DEFAULT_MIN_TIER, dataCollection.DEFAULT_MAX_TIER);
+
+    if (formData.get("match-skills") != null) {
+        purifiedData.skillWeightPref = "MATCH";
+
+    } else {
+        purifiedData.skillWeightPref = "NONE";
+
+    }
 
     return purifiedData;
 }
@@ -190,7 +199,7 @@ form.addEventListener("submit", async (event) => {
     try {
         const formData = purifyFormData(new FormData(form));
     
-        await displayRecommendations(formData.username, formData.minTier, formData.maxTier);
+        await displayRecommendations(formData.username, formData.minTier, formData.maxTier, formData.skillWeightPref);
 
     } catch (err) {
         errorMsg(err.message);
