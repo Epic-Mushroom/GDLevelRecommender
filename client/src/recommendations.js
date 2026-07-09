@@ -44,12 +44,14 @@ const STEP_2_WEIGHT_CALC_P2 = 2.0;
 // for skill weighting
 const SKILL_VECTOR_NORMALIZATION_MAGNITUDE = 100.0;
 // if the user's skillset perfectly aligns with a level, this is the final multiplier to the weight
-const MAX_SKILL_MATCH_MULTIPLIER = 3.0;
+const MAX_SKILL_MATCH_MULTIPLIER = 1.5;
 // and this is the opposite
 const MAX_SKILL_CONTRAST_MULTIPLIER = 0.27;
 // multiplies this with perfect match multiplier and multiplies the reciprocal with perfect contrast multiplier
 // when trying to aggressively fit skills
 const SKILL_FIT_AGGRESSION_MULTIPLIER = 2.2;
+const NUM_USER_SKILLS_TO_SCORE = 5;
+const NUM_LEVEL_SKILLS_TO_SCORE = 3;
 // for use in modified average weight
 const STEP_3_WEIGHT_CONSTANT = 2.0;
 const STEP_3_WEIGHT_CALC_B = 0.6174;
@@ -105,7 +107,7 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
 
     if (cumulativeResult > 0 && skillWeightPref !== EnjoymentProfile.SKILL_WEIGHT_PREF.NONE) {
         // const cosineSim = cosineSimilarity(modifiedUserSkills, modifiedLevelSkills, SKILL_VECTOR_NORMALIZATION_MAGNITUDE, SKILL_VECTOR_NORMALIZATION_MAGNITUDE);
-        const userSkillsScore = scoreVector(modifiedUserSkills, modifiedLevelSkills, 3);
+        const userSkillsScore = scoreVector(modifiedUserSkills, modifiedLevelSkills, NUM_USER_SKILLS_TO_SCORE, NUM_LEVEL_SKILLS_TO_SCORE);
         let skillMultiplier = 1.0;
 
         const maxMultiplier = ((mainUserProfile.skillWeightAggression) ?

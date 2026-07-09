@@ -220,36 +220,49 @@ export function cosineSimilarity(arr2D1, arr2D2, magnitude1, magnitude2) {
 /**
  * gives a 2D array a score depending on whether or not the values (index 1 elements) have a higher ratio than
  * the respective values in the rubric array
- * @param {*} arr2D 
- * @param {*} rubricArr2D 
- * @param {*} maxNumRubricItems how many items from the rubric to consider, will pick the highest ratio rubric items
- * @param {*} leniencyRange if a value's ratio from the input is less than the corresponding rubric ratio but falls within
- *                          the leniency range, will not be penalized
+ * @param {[*, number][]} arr2D 
+ * @param {[*, number][]} rubricArr2D 
+ * @param {number} maxNumInputItems how many items from the input to consider in scoring, note that any left out items will have their value treated as zero
+ * @param {number} maxNumRubricItems how many items from the rubric to consider, will pick the highest ratio rubric items
+ * @param {number} leniencyRange if a value's ratio from the input is less than the corresponding rubric ratio but falls within
+ *                          the leniency range, will be penalized less
+ * @param {number} strongRatio the ratio a rubric item must be to be considered "strong"; items will be given a higher
+ *                          score if they pass a strong ratio, and be penalized more if they fail a strong ratio
+ * @param {number} veryStrongRatio similar to strongRatio but the bonus/penalization is even higher for this ratio
  */
-export function scoreVector(arr2D, rubricArr2D, maxNumRubricItems, leniencyRange = 0.2) {
+export function scoreVector(
+    arr2D, rubricArr2D, maxNumInputItems = null, maxNumRubricItems = null,
+    leniencyRange = 0.2, strongRatio = (1.0 / 3), veryStrongRatio = 0.6) {
     // ratio is out of the input array's highest value
-    const arrRangeEnd = Math.max(...arr2D.map(keyValPair => keyValPair[1]));
-    const arrRatios2D = arr2D.map(([key, val]) => [key, adjustToRange(val, [0, arrRangeEnd], [0.0, 1.0])]);
-    const arrRatiosMap = new Map(arrRatios2D);
+    const filteredArr2D = (maxNumInputItems != null) ? getNBest(arr2D, maxNumInputItems, ([key, val]) => -val) : arr2D;
+    const filteredArrRangeEnd = Math.max(...filteredArr2D.map(keyValPair => keyValPair[1]));
+    const filteredArrRatios2D = filteredArr2D.map(([key, val]) => [key, adjustToRange(val, [0, filteredArrRangeEnd], [0.0, 1.0])]);
+    const filteredArrRatiosMap = new Map(filteredArrRatios2D);
 
     // ratio is out of the sum of values
-    const rubricRangeSum = rubricArr2D.map(keyValPair => keyValPair[1]).reduce((sum, val) => sum + val, 0);
-    const rubricRatios2D = rubricArr2D.map(([key, val]) => [key, adjustToRange(val, [0, rubricRangeSum], [0.0, 1.0])]);
+    const filteredRubricArr2D = (maxNumRubricItems != null) ? getNBest(rubricArr2D, maxNumRubricItems, ([key, val]) => -val) : rubricArr2D;
+    const filteredRubricRangeSum = filteredRubricArr2D.map(keyValPair => keyValPair[1]).reduce((sum, val) => sum + val, 0);
+    const filteredRubricRatios2D = filteredRubricArr2D.map(([key, val]) => [key, adjustToRange(val, [0, filteredRubricRangeSum], [0.0, 1.0])]);
 
-    const filteredRubricRatios2D = getNBest(rubricRatios2D, maxNumRubricItems, ([key, val]) => -val);
-
-    const [minScore, maxScore] = [-maxNumRubricItems, maxNumRubricItems];
+    const [minScore, maxScore] = [-maxNumRubricItems * 3, maxNumRubricItems * 3];
 
     let score = 0;
     for (const [key, rubricRatio] of filteredRubricRatios2D) {
-        const arrRatio = arrRatiosMap.get(key) || 0;
+        const arrRatio = filteredArrRatiosMap.get(key) || 0;
+        const isStrongRatio = rubricRatio >= strongRatio;
+        const isVeryStrongRatio = rubricRatio >= veryStrongRatio;
 
         if (arrRatio >= rubricRatio) {
-            score += 1;
+            score += (isStrongRatio) ? 2 : 0.5;
+            score += (isVeryStrongRatio) ? 1 : 0;
 
-        } else if (arrRatio < rubricRatio - leniencyRange) {
-            score -= 1;
+        } else if (arrRatio >= rubricRatio - leniencyRange) {
+            score -= (isVeryStrongRatio) ? 1.5 : 1;
             
+        } else {
+            score -= (isStrongRatio) ? 2 : 1;
+            score -= (isVeryStrongRatio) ? 1 : 0
+
         }
     }
 
