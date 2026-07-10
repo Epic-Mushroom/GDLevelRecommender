@@ -257,9 +257,9 @@ app.get("/api/user/:userID", async (req, res) => {
     try {
         let forceUpdate = false;
 
-        if (req.query.forceUpdate != null) {
-            forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
-        }
+        // if (req.query.forceUpdate != null) {
+        //     forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
+        // }
         
         let user = await User.findOne({userID: id}, "-_id");
 
@@ -311,9 +311,9 @@ app.get("/api/level/:levelID", async (req, res) => {
     try {
         let forceUpdate = false;
 
-        if (req.query.forceUpdate != null) {
-            forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
-        }
+        // if (req.query.forceUpdate != null) {
+        //     forceUpdate = req.query.forceUpdate.trim().toLowerCase() === "true";
+        // }
 
         let level = await Level.findOne({levelID: id}, "-_id");
 
