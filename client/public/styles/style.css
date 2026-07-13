@@ -435,9 +435,13 @@ p {
   padding: 5px 14px;
 
   font-size: 90%;
-  max-width: calc(100% - 5px);
+  max-width: calc(100% - 108px);
 }
 
+.progress-text {
+  color: #295e6d;
+}
+    
 #error-message-text {
     display: none;
     color: red;

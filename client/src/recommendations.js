@@ -575,8 +575,8 @@ class DataManager {
     useDebugData() {
         this.reset();
 
-        dataManager.mainUserEnjProfile.setUserID(92);
-        dataManager.mainUserEnjProfile.setUsername("diffieHellmanSpongebob93229"); 
+        this.mainUserEnjProfile.setUserID(92);
+        this.mainUserEnjProfile.setUsername("diffieHellmanSpongebob93229"); 
 
         // these may not be accurate but this is for debug purposes anyway
         const CLUBSTEP = {
@@ -678,30 +678,30 @@ class DataManager {
             skills2DArr: []
         };
 
-        dataManager.addMainUserEnjRating(1, 3, CLUBSTEP);
-        dataManager.addMainUserEnjRating(2, 3, TOE2);
-        dataManager.addMainUserEnjRating(3, 9, DEADLOCKED);
+        this.addMainUserEnjRating(1, 3, CLUBSTEP);
+        this.addMainUserEnjRating(2, 3, TOE2);
+        this.addMainUserEnjRating(3, 9, DEADLOCKED);
 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, CLUBSTEP); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, TOE2); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, DEADLOCKED); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, DIGITAL_DESCENT); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, AZURITE_SILLOW); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, LAZURITE); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, AZURITE_ROYEN); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 23232233, 10, DOESNT_EXIST_2); 
-        dataManager.addOtherUserEnjRating(666666, "IncompatibleGuy", 23232234, 10, DOESNT_EXIST_3); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 1, 10, CLUBSTEP); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 2, 10, TOE2); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 3, 1, DEADLOCKED); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 37456092, 10, DIGITAL_DESCENT); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 62214792, 10, AZURITE_SILLOW); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 42566186, 10, LAZURITE); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 59533451, 10, AZURITE_ROYEN); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 23232233, 10, DOESNT_EXIST_2); 
+        this.addOtherUserEnjRating(666666, "IncompatibleGuy", 23232234, 10, DOESNT_EXIST_3); 
 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, CLUBSTEP);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, TOE2);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, DEADLOCKED);
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, DIGITAL_DESCENT); 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, AZURITE_SILLOW); 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, HEAVENS_DOOR); 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, ETHEREAL_ARTIFICE); 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, NEXT_STAGE); 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 27690100, 10, SLAUGHTERHOUSE); 
-        dataManager.addOtherUserEnjRating(676767, "CompatibleGamer727", 222222, 10, DOESNT_EXIST); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 1, 2, CLUBSTEP);
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 2, 2, TOE2);
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 3, 8, DEADLOCKED);
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 37456092, 3, DIGITAL_DESCENT); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 62214792, 5, AZURITE_SILLOW); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 91739197, 10, HEAVENS_DOOR); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 58252259, 9, ETHEREAL_ARTIFICE); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 132898839, 10, NEXT_STAGE); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 27690100, 10, SLAUGHTERHOUSE); 
+        this.addOtherUserEnjRating(676767, "CompatibleGamer727", 222222, 10, DOESNT_EXIST); 
     }
 }
 

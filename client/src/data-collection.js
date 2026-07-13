@@ -78,12 +78,30 @@ const DEFAULT_OTHER_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 // when requesting batches of ids from backend api
 const MAX_LEVEL_ID_BATCH_SIZE = 200;
 
+export const PROGRESS = Object.freeze({
+    "NONE": "",
+    "FAILED": "Failed getting recommendations",
+    "RATE_LIMITED": "Currently rate limited by GDDL API, hang on...",
+    "STAGE_0": "Retrieving user info",
+    "STAGE_1": "Collecting user enjoyment ratings",
+    "STAGE_2": "Finding neighbors",
+    "STAGE_3": "Number crunching",
+    "STAGE_4": "Finding peak levels",
+    "STAGE_5": "Number crunching v2",
+    "DONE": "Done!"
+});
+
 export const trackers = {
     numAPICalls: 0,
     numAPISuccesses: 0,
     numAPIErrors: 0,
 
-    numRecommendationsSent: 0
+    numRecommendationsSent: 0,
+
+    progressState: PROGRESS.NONE,
+    progressValue: 0,
+
+    totalTimeElapsed: 0 // seconds
 }
 
 export const flags = {
@@ -727,6 +745,8 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 0: collect initial data
     // should move this to its own function 
+    trackers.progressState = PROGRESS.STAGE_0;
+    trackers.totalTimeElapsed = 0;
     let timestamp = Date.now();
     const userDetails = await requestUserDetails(username);
     if (userDetails == null) {
@@ -755,18 +775,21 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // stage 1: registering user submissions
     // uses the backend db to fetch submissions
+    trackers.progressState = PROGRESS.STAGE_1;
     timestamp = Date.now();
     await registerUserSubmissions(userID, foundUsername, false); // intentionally leaving out min and max tier to get better user tastes
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 1 TIME ELAPSED: ${timeElapsedPerStage[1]}ms`);
 
     // stage 2: collecting a list of users to analyze
+    trackers.progressState = PROGRESS.STAGE_2;
     timestamp = Date.now();
     await registerAllOtherUserCommonSubmissions();
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 2 TIME ELAPSED: ${timeElapsedPerStage[2]}ms`);
 
     // stage 3: calculating compats
+    trackers.progressState = PROGRESS.STAGE_3;
     timestamp = Date.now();
     dataManager.calculateAllCompats();
     console.log("calculated compatibilities and adjustments");
@@ -774,6 +797,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log(`STAGE 3 TIME ELAPSED: ${timeElapsedPerStage[3]}ms`);
 
     // stage 4: registering the submissions of the collected users
+    trackers.progressState = PROGRESS.STAGE_4;
     timestamp = Date.now();
     await registerAllOtherUserSubmissions(minTier, maxTier);
     console.log("registered all other user submissions");
@@ -781,15 +805,17 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     console.log(`STAGE 4 TIME ELAPSED: ${timeElapsedPerStage[4]}ms`);
 
     // stage 5: registering all level weights
+    trackers.progressState = PROGRESS.STAGE_5;
     timestamp = Date.now();
     dataManager.addAllWeights(minTier, maxTier);
     console.log("added all weights");
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 5 TIME ELAPSED: ${timeElapsedPerStage[5]}ms`);
 
-    const totalTimeElapsed = timeElapsedPerStage.reduce(((acc, elem) => acc + elem), 0);
-    console.log(`TOTAL TIME ELAPSED: ${totalTimeElapsed}ms`);
+    trackers.totalTimeElapsed = timeElapsedPerStage.reduce(((acc, elem) => acc + elem), 0);
+    console.log(`TOTAL TIME ELAPSED: ${trackers.totalTimeElapsed}ms`);
 
+    trackers.progressState = PROGRESS.DONE;
     const levelRecs = dataManager.getMostRecommendedLevels(DEFAULT_NUM_RECOMMENDATIONS);
     trackers.numRecommendationsSent += levelRecs.length;
     return levelRecs;

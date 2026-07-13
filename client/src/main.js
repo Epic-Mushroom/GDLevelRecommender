@@ -11,6 +11,37 @@ const LEVEL_CARD_DELAY = 500; // milliseconds
 function tick(numTicks) {
     let newTicks = numTicks + 1;
 
+    // track various dataManager values here
+    switch (dataCollection.trackers.progressState) {
+        case dataCollection.PROGRESS.STAGE_1:
+            dataCollection.trackers.progressValue = window.dataManager.mainUserEnjProfile.ratingMap.size;
+            progressValueText.textContent = `(${dataCollection.trackers.progressValue})`;
+            break;
+        
+        case dataCollection.PROGRESS.STAGE_2:
+            dataCollection.trackers.progressValue = window.dataManager.otherUserEnjProfileMap.size;
+            progressValueText.textContent = `(${dataCollection.trackers.progressValue})`;
+            break;
+
+        case dataCollection.PROGRESS.STAGE_4:
+            dataCollection.trackers.progressValue = window.dataManager.cachedLevelInfo.size;
+            progressValueText.textContent = `(${dataCollection.trackers.progressValue})`;
+            break;
+
+        case dataCollection.PROGRESS.DONE:
+            dataCollection.trackers.progressValue = dataCollection.trackers.totalTimeElapsed;
+            progressValueText.textContent = `(${dataCollection.trackers.progressValue} ms)`;
+            break;
+
+        default:
+            dataCollection.trackers.progressValue = 0;
+            progressValueText.textContent = ``;
+            break;
+
+    }
+
+    progressMessageText.textContent = dataCollection.trackers.progressState;
+
     // restarts the timer
     setTimeout(() => {
         tick(newTicks);
@@ -25,7 +56,7 @@ const root = document.documentElement;
  * 
  * @param {HTMLElement} element 
  * @param {string} className 
- * @param {boolean}} hideOnceFinished 
+ * @param {boolean} hideOnceFinished 
  */
 function startAnimation(element, className, hideOnceFinished = false) {
     if (hideOnceFinished) {
@@ -230,6 +261,8 @@ const usernameField = document.getElementById("username-field");
 const recommendationsContainer = document.getElementById("recommendations-container");
 
 const errorMessageText = document.getElementById("error-message-text");
+const progressMessageText = document.getElementById("progress-message-text");
+const progressValueText = document.getElementById("progress-value-text");
 
 // element listeners
 form.addEventListener("submit", async (event) => {
