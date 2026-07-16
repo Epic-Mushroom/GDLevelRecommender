@@ -184,6 +184,9 @@ async function addLevelCard(levelID, levelWeightInfo) {
 
     });
 
+    levelCard.style.setProperty("background-image", `linear-gradient(to bottom, rgb(206, 206, 206) 0%, rgba(255, 255, 255, 0.452) 90%),
+        url("https://levelthumbs.prevter.me/thumbnail/${levelID}/small")`)
+
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
 }
