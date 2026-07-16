@@ -20,6 +20,58 @@
 }
 
 :root {
+  --tier1: #dddfee;
+  --tier2: #d5d3e9;
+  --tier3: #d3cbe7;
+  --tier4: #d3c3e4;
+  --tier5: #d4bbe2;
+  --tier6: #d5b0de;
+  --tier7: #dba7dc;
+  --tier8: #db9fd1;
+  --tier9: #d991c1;
+  --tier10: #da86b0;
+  --tier11: #db7698;
+  --tier12: #dc6a7d;
+  --tier13: #dd5a5a;
+  --tier14: #dc514c;
+  --tier15: #da493e;
+  --tier16: #da4534;
+  --tier17: #d93e26;
+  --tier18: #cd3f23;
+  --tier19: #c03a1b;
+  --tier20: #b23415;
+  --tier21: #a23010;
+  --tier22: #9b2b0c;
+  --tier23: #932b0b;
+  --tier24: #892608;
+  --tier25: #832607;
+  --tier26: #752105;
+  --tier27: #6c1e04;
+  --tier28: #601a02;
+  --tier29: #5A1802;
+  --tier30: #521700;
+  --tier31: #4F0A01;
+  --tier32: #4A0207;
+  --tier33: #470313;
+  --tier34: #42041E;
+  --tier35: #400427;
+  --tier36: #3D0630;
+  --tier37: #380635;
+  --tier38: #360432;
+  --tier39: #250630;
+  
+  --enj0: #E67C73;
+  --enj1: #ED9573;
+  --enj2: #F3AE72;
+  --enj3: #F8C670;
+  --enj4: #FCDE6C;
+  --enj5: #FFF666;
+  --enj6: #E0EB72;
+  --enj7: #C1DF7B;
+  --enj8: #A1D381;
+  --enj9: #7EC786;
+  --enj10: #57BB8A;
+
   --text: #211d27;
   --text-h: #08060d;
   --bg: #fff;
@@ -430,15 +482,17 @@ p {
 
 .tier-enjoyment-display {
   position: absolute;
-  top: 0%;
-  right: 0%;
+  top: 3%;
+  right: 3%;
 
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .rating-value {
-  padding: 12px;
+  padding: 6px 12px 6px 12px;
+  border-radius: 10px;
 }
 
 .skills-display {

@@ -114,8 +114,10 @@ async function addLevelCard(levelID, levelWeightInfo) {
     const levelName = levelCardFragment.querySelector(".level-name");
     const levelIDText = levelCardFragment.querySelector(".level-id");
     const authorName = levelCardFragment.querySelector(".author-name");
-    const tier = levelCardFragment.querySelector(".tier");
-    const enj = levelCardFragment.querySelector(".enjoyment");
+    const tierSlot = levelCardFragment.getElementById("tier-slot");
+    const enjSlot = levelCardFragment.getElementById("enjoyment-slot");
+    const tierNumber = levelCardFragment.querySelector(".tier");
+    const enjNumber = levelCardFragment.querySelector(".enjoyment");
 
     const recInfo = levelCardFragment.querySelector(".rec-info");
     const trashRec = levelCardFragment.querySelector(".trash-rec");
@@ -144,8 +146,14 @@ async function addLevelCard(levelID, levelWeightInfo) {
 
     levelName.textContent = name;
     authorName.textContent = author;
-    tier.textContent = Math.round(tierValue);
-    enj.textContent = Math.round(enjValue);
+    tierNumber.textContent = Math.round(tierValue);
+    enjNumber.textContent = Math.round(enjValue * 10) / 10;
+
+    tierSlot.style.backgroundColor = `var(--tier${Math.round(tierValue)})`;
+    if (Math.round(tierValue) >= 16) {
+        tierSlot.style.color = "#fff";
+    }
+    enjSlot.style.backgroundColor = `var(--enj${Math.round(enjValue)})`;
 
     if (authorName.textContent == null) {
         const author = levelCardFragment.querySelector(".author");

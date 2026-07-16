@@ -675,8 +675,7 @@ async function registerAllRelevantLevelInfo(minTier = DEFAULT_MIN_TIER, maxTier 
     const response = await requestLevelInfoBatch(megaLevelIDsBatchArr);
 
     for (const levelData of response) {
-        // INCORPORATE SKILLS HERE
-        // .........!!!!!!!!!!!>!<>!<!>!<<!>!<!
+        // need to incorporate level skills
         dataManager.addLevelInfoToCache(levelData.levelID, {
             actualRating: levelData.t,
             actualEnj: levelData.e,

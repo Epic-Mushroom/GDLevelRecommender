@@ -667,14 +667,14 @@ class DataManager {
         };
         const DOESNT_EXIST_2 = {
             actualRating: 1,
-            actualEnj: 0,
+            actualEnj: 0.1,
             levelName: "angelicide 67",
             levelAuthor: "me",
             skills2DArr: []
         };
         const DOESNT_EXIST_3 = {
             actualRating: 12,
-            actualEnj: 5,
+            actualEnj: 5.5,
             levelName: "stop",
             levelAuthor: "itsadvystylez",
             skills2DArr: []
