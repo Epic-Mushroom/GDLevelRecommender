@@ -58,6 +58,8 @@ const STEP_3_WEIGHT_CONSTANT = 2.0;
 const STEP_3_WEIGHT_CALC_B = 0.6174;
 const STEP_3_WEIGHT_CALC_A = 0.2377;
 const STEP_3_WEIGHT_CALC_A2 = 0.588235294;
+const STEP_3_WEIGHT_CALC_A3 = 1.5;
+const STEP_3_WEIGHT_CALC_A4 = -0.3;
 
 /**
  * 
@@ -528,7 +530,7 @@ class DataManager {
         //const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
 
         // newer v3 calculation: see v2 but penalizes low common user count even more
-        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), (newNumRatings - 0.5)) + 1) / newNumRatings;
+        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), (STEP_3_WEIGHT_CALC_A3 * newNumRatings + STEP_3_WEIGHT_CALC_A4)) + 1) / newNumRatings;
 
         this.levelWeightsMap.set(levelID, {
             rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, 

@@ -201,7 +201,9 @@ async function displayRecommendations(username, minTier, maxTier, skillWeightPre
     recommendationsContainer.style.setProperty("display", "none");
     recommendationsContainer.replaceChildren();
 
+    disclaimer.style.setProperty("display", "block");
     const levelRecs = await dataCollection.getRecommendations(username, minTier, maxTier, skillWeightPref);
+    disclaimer.style.setProperty("display", "none");
     recommendationsContainer.style.setProperty("display", "grid");
 
     const h2 = document.createElement("h2");
@@ -260,6 +262,7 @@ const usernameField = document.getElementById("username-field");
 
 const recommendationsContainer = document.getElementById("recommendations-container");
 
+const disclaimer = document.getElementById("disclaimer");
 const errorMessageText = document.getElementById("error-message-text");
 const progressMessageText = document.getElementById("progress-message-text");
 const progressValueText = document.getElementById("progress-value-text");

@@ -442,7 +442,11 @@ p {
   color: #295e6d;
 }
     
-#error-message-text {
+#disclaimer {
+  display: none;
+}
+
+.error-message-text {
     display: none;
     color: red;
 }
