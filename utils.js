@@ -291,3 +291,19 @@ export function scoreVector(
     return adjustToRange(score, [minScore, maxScore], [0, 1]);
 
 }
+
+/**
+ * 
+ * @param {Array<number>} timeElapsedMs a one-element array containing the time elapsed in ms
+ * @param {*} startUnixTimeMs 
+ */
+export function stopwatch(timeElapsedMs, startUnixTimeMs) {
+    if (startUnixTimeMs == null) {
+        startUnixTimeMs = Date.now();
+    }
+
+    setTimeout(() => {
+        timeElapsedMs[0] = Date.now() - startUnixTimeMs;
+        stopwatch(timeElapsedMs, startUnixTimeMs);
+    }, 30)
+}

@@ -11,7 +11,8 @@ const LEVEL_CARD_DELAY = 500; // milliseconds
 function tick(numTicks) {
     let newTicks = numTicks + 1;
 
-    // track various dataManager values here
+    timeElapsedText.style.setProperty("display", "block");
+
     switch (dataCollection.trackers.progressState) {
         case dataCollection.PROGRESS.STAGE_1:
             dataCollection.trackers.progressValue = window.dataManager.mainUserEnjProfile.ratingMap.size;
@@ -29,11 +30,13 @@ function tick(numTicks) {
             break;
 
         case dataCollection.PROGRESS.DONE:
+            timeElapsedText.style.setProperty("display", "none");
             dataCollection.trackers.progressValue = dataCollection.trackers.totalTimeElapsed;
-            progressValueText.textContent = `(${dataCollection.trackers.progressValue} ms)`;
+            progressValueText.textContent = `(${Math.round(dataCollection.trackers.progressValue / 10) / 100.0} s)`;
             break;
 
         default:
+            timeElapsedText.style.setProperty("display", "none");
             dataCollection.trackers.progressValue = 0;
             progressValueText.textContent = ``;
             break;
@@ -41,6 +44,7 @@ function tick(numTicks) {
     }
 
     progressMessageText.textContent = dataCollection.trackers.progressState;
+    timeElapsedText.textContent = `${Math.round(dataCollection.trackers.totalTimeElapsed / 10) / 100.0} s`;
 
     // restarts the timer
     setTimeout(() => {
@@ -206,7 +210,7 @@ async function addLevelCard(levelID, levelWeightInfo) {
         default:
             break;
     }
-    levelCard.style.setProperty("background-image", `linear-gradient(to bottom, rgb(206, 206, 206) 0%, rgba(255, 255, 255, 0.452) 90%),
+    levelCard.style.setProperty("background-image", `linear-gradient(to bottom, rgba(206, 206, 206, 0.8) 0%, rgba(255, 255, 255, 0.4) 75%),
         url("https://levelthumbs.prevter.me/thumbnail/${thumbnailID}/small")`)
 
     recommendationsContainer.append(levelCardFragment);
@@ -291,6 +295,7 @@ const disclaimer = document.getElementById("disclaimer");
 const errorMessageText = document.getElementById("error-message-text");
 const progressMessageText = document.getElementById("progress-message-text");
 const progressValueText = document.getElementById("progress-value-text");
+const timeElapsedText = document.getElementById("time-elapsed");
 
 // element listeners
 form.addEventListener("submit", async (event) => {

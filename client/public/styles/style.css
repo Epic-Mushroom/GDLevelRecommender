@@ -515,6 +515,10 @@ p {
 .progress-text {
   color: #295e6d;
 }
+
+#time-elapsed {
+  color: gray;
+}
     
 #disclaimer {
   display: none;

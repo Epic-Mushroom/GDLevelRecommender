@@ -1,6 +1,6 @@
 import * as recs from "./recommendations.js";
 import {dataManager} from "./recommendations.js"
-import {getRandomInt, getNBest, sleep, chunkArray, measureTime, normalize2DArr} from "../../utils.js";
+import {getRandomInt, getNBest, sleep, chunkArray, measureTime, normalize2DArr, stopwatch} from "../../utils.js";
 
 const BACKEND_API_URL = "https://gdlevelrecsdb.onrender.com/api";// db that contains only necessary data for this site
 const GDDL_API_URL = "https://gdladder.com/api";
@@ -101,12 +101,27 @@ export const trackers = {
     progressState: PROGRESS.NONE,
     progressValue: 0,
 
-    totalTimeElapsed: 0 // seconds
+    totalTimeElapsed: 0, // seconds
+    timeIntervalID: null
 }
 
 export const flags = {
 
 };
+
+function trackTimeElapsed() {
+    stopTrackingTimeElapsed();
+    trackers.totalTimeElapsed = 0;
+
+    const arr = [trackers.totalTimeElapsed];
+    stopwatch(arr);
+
+    trackers.timeIntervalID = setInterval(() => trackers.totalTimeElapsed = arr[0], 30);
+}
+
+function stopTrackingTimeElapsed() {
+    clearInterval(trackers.timeIntervalID);
+}
 
 class Semaphore {
     // max how many api calls to make concurrently
@@ -745,7 +760,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     // stage 0: collect initial data
     // should move this to its own function 
     trackers.progressState = PROGRESS.STAGE_0;
-    trackers.totalTimeElapsed = 0;
+    trackTimeElapsed();
     let timestamp = Date.now();
     const userDetails = await requestUserDetails(username);
     if (userDetails == null) {
@@ -811,7 +826,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     timeElapsedPerStage.push(Date.now() - timestamp);
     console.log(`STAGE 5 TIME ELAPSED: ${timeElapsedPerStage[5]}ms`);
 
-    trackers.totalTimeElapsed = timeElapsedPerStage.reduce(((acc, elem) => acc + elem), 0);
+    stopTrackingTimeElapsed();
     console.log(`TOTAL TIME ELAPSED: ${trackers.totalTimeElapsed}ms`);
 
     trackers.progressState = PROGRESS.DONE;
