@@ -192,8 +192,22 @@ async function addLevelCard(levelID, levelWeightInfo) {
 
     });
 
+    let thumbnailID = levelID;
+    switch (levelID) {
+        case 1:
+            thumbnailID = 14;
+            break;
+        case 2:
+            thumbnailID = 18;
+            break;
+        case 3:
+            thumbnailID = 20;
+            break;
+        default:
+            break;
+    }
     levelCard.style.setProperty("background-image", `linear-gradient(to bottom, rgb(206, 206, 206) 0%, rgba(255, 255, 255, 0.452) 90%),
-        url("https://levelthumbs.prevter.me/thumbnail/${levelID}/small")`)
+        url("https://levelthumbs.prevter.me/thumbnail/${thumbnailID}/small")`)
 
     recommendationsContainer.append(levelCardFragment);
     startAnimation(levelCard, "slide-right-and-fade-in");
