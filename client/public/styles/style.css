@@ -524,3 +524,17 @@ p {
     display: none;
     color: red;
 }
+
+#footer {
+    background-color: #000000;
+    font-size: small;
+    color: #ffffff;
+
+    position: absolute;
+    bottom: 0%;
+
+    width: 100%;
+    margin: 0 auto;
+    padding-top: 7px;
+    padding-bottom: 7px;
+}
