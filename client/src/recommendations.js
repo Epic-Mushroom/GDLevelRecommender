@@ -555,7 +555,7 @@ class DataManager {
                 const actualRating = ratingInfo.actualRating;
                 const levelSkills = ratingInfo.skills2DArr;
 
-                const calculatedWeightDetails = calculateWeight(adjustedEnjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
+                const calculatedWeightDetails = calculateWeight(enjRating, actualRating, levelSkills, minTier, maxTier, otherUserEnjProfile.adjustedCompat, this.mainUserEnjProfile);
 
                 this.addWeight(levelID, calculatedWeightDetails, ratingInfo);
             }

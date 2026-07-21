@@ -38,6 +38,7 @@ function tick(numTicks) {
         default:
             timeElapsedText.style.setProperty("display", "none");
             dataCollection.trackers.progressValue = 0;
+            
             progressValueText.textContent = ``;
             break;
 
