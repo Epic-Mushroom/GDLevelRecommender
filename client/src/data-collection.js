@@ -385,7 +385,7 @@ export async function getLevelSkillsGDDL(levelID, limit = null) {
         const skillsMap = new Map(); // each skill by id mapped to num of votes
 
         for (const tag of tags) {
-            const skillIDString = SKILLS_MAPPING.get(tag.Tag.TagID);
+            const skillIDString = tag.TagID.toString();
             skillsMap.set(skillIDString, tag.ReactCount);
         }
 

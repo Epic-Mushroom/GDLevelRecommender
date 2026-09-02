@@ -155,7 +155,7 @@ export async function updateLevelID(levelID, baseData = null) {
     for (let pageNumF = 0; pageNumF <= maxPageNum; pageNumF = pageNumF + pageNumInc) {
         const pageNum = Math.round(pageNumF);
 
-        pageRequests.push(getGDDLResponse(["level", levelID, "submissions"], {
+        pageRequests.push(getGDDLResponse(["levels", levelID, "submissions"], {
             sort: "enjoyment",
             sortDirection: "desc", 
             twoPlayer: false,
