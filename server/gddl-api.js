@@ -159,7 +159,7 @@ export async function getAPIResponse(pathVariables, queryParams, customURL = nul
 }
 
 export async function requestLevelSkills(levelID) {
-    const response = await getAPIResponse(["level", levelID, "tags"], {});
+    const response = await getAPIResponse(["levels", levelID, "tags"], {});
 
     return response;
 }
@@ -171,7 +171,7 @@ export async function getLevelSkills(levelID, limit = null) {
         const skillsMap = new Map(); // each skill by id mapped to num of votes
 
         for (const tag of tags) {
-            const skillIDString = SKILLS_MAPPING.get(tag.Tag.Name);
+            const skillIDString = SKILLS_MAPPING.get(tag.Tag.TagID);
             skillsMap.set(skillIDString, tag.ReactCount);
         }
 

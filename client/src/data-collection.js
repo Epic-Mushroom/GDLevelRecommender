@@ -65,10 +65,10 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 75;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 82;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
-const TIER_RANGE_OFFSET = 5;
+const TIER_RANGE_OFFSET = 4;
 // up to [this value] levels from other users will be tracked
 const MAX_OTHER_USER_SUBMISSIONS = 25;
 // for sorting when gathering submissions from other users' pages
@@ -109,7 +109,8 @@ export const flags = {
 
 };
 
-function trackTimeElapsed() {
+function startTrackingTimeElapsed() {
+    // this is just not a good way to go about doing this
     stopTrackingTimeElapsed();
     trackers.totalTimeElapsed = 0;
 
@@ -217,13 +218,13 @@ async function getAPIResponse(pathVariables, queryParams, useGDDL = false, retri
  * @param {string} username 
  */
 async function requestUserDetails(username) {
-    const response = await getAPIResponse(["user", "search"], {limit: 1, name: username}, true);
+    const response = await getAPIResponse(["user"], {limit: 1, name: username}, true);
 
-    if (response.length === 0) {
+    if (response.data == null || response.data.length === 0) {
         return null;
 
     } else {
-        return [response[0].ID, response[0].Name];
+        return [response.data[0].ID, response.data[0].Name];
     }
 }
 
@@ -278,13 +279,13 @@ async function requestUserSubmissionsGDDL(userID, minTier, maxTier, pageNum, sor
 }
 
 export async function requestLevelInfo(levelID) {
-    const response = await getAPIResponse(["level", levelID], {});
+    const response = await getAPIResponse(["levels", levelID], {});
 
     return response;
 }
 
 export async function requestLevelShowcaseGDDL(levelID) {
-    const response = await getAPIResponse(["level", levelID], {}, true);
+    const response = await getAPIResponse(["levels", levelID], {}, true);
 
     return response.Showcase;
 }
@@ -369,7 +370,7 @@ export async function getUserSkillsGDDL(userID) {
 }
 
 async function requestLevelSkillsGDDL(levelID) {
-    const response = await getAPIResponse(["level", levelID, "tags"], {}, true);
+    const response = await getAPIResponse(["levels", levelID, "tags"], {}, true);
 
     return response;
 }
@@ -384,7 +385,7 @@ export async function getLevelSkillsGDDL(levelID, limit = null) {
         const skillsMap = new Map(); // each skill by id mapped to num of votes
 
         for (const tag of tags) {
-            const skillIDString = SKILLS_MAPPING.get(tag.Tag.Name);
+            const skillIDString = SKILLS_MAPPING.get(tag.Tag.TagID);
             skillsMap.set(skillIDString, tag.ReactCount);
         }
 
@@ -720,7 +721,6 @@ async function registerAllOtherUserSubmissions(
     const promiseArr = [];
     for (const otherUserEnjProfile of otherUsersSet) {
         // console.log(`registering other user submissions from user ID: ${otherUserEnjProfile.userID}`);
-
         const sortDirection = "desc";
 
         // don't use this; it takes WAY too long due to having to register whole profiles into backend
@@ -746,7 +746,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
 
     // debug purposes only
     if (username === DEBUG_USERNAME) {
-        dataManager.useDebugData();
+        dataManager.useDebugData(); 
 
         dataManager.calculateAllCompats();
         dataManager.addAllWeights(minTier, maxTier);
@@ -760,7 +760,7 @@ export async function getRecommendations(username, minTier = DEFAULT_MIN_TIER, m
     // stage 0: collect initial data
     // should move this to its own function 
     trackers.progressState = PROGRESS.STAGE_0;
-    trackTimeElapsed();
+    startTrackingTimeElapsed();
     let timestamp = Date.now();
     const userDetails = await requestUserDetails(username);
     if (userDetails == null) {

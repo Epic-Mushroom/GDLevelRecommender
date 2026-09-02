@@ -275,7 +275,7 @@ app.get("/api/user/:userID", async (req, res) => {
         res.status(errorDetails.status).json({error: errorDetails.message});
     }
 });
-app.get("/api/level", async (req, res) => {
+app.get("/api/levels", async (req, res) => {
     try {
         let queryObject = {};
         let ids = [];
@@ -305,7 +305,7 @@ app.get("/api/level", async (req, res) => {
 
     }
 });
-app.get("/api/level/:levelID", async (req, res) => {
+app.get("/api/levels/:levelID", async (req, res) => {
     const id = parseInt(req.params.levelID);
 
     try {
