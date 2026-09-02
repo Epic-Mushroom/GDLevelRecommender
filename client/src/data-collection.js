@@ -301,7 +301,7 @@ export async function requestLevelInfoBatch(levelIDs) {
 
     const promiseArr = [];
     for (const chunk of chunkedArr) {
-        promiseArr.push(getAPIResponse(["level"], {
+        promiseArr.push(getAPIResponse(["levels"], {
             levelIDs: chunk.join(",")
         }).then((response) => {
             if (chunk.length !== response.length) {
@@ -319,7 +319,7 @@ export async function requestLevelInfoBatch(levelIDs) {
 }
 
 async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
-    const response = await getAPIResponse(["level", levelID, "submissions"], {
+    const response = await getAPIResponse(["levels", levelID, "submissions"], {
         sort: DEFAULT_SUBMISSIONS_SORT,
         sortDirection: sortDirection,
         twoPlayer: false,
@@ -332,7 +332,7 @@ async function requestLevelSubmissionsGDDL(levelID, pageNum, sortDirection) {
 }
 
 async function requestLevelSubmissions(levelID) {
-    const response = await getAPIResponse(["level", levelID], {});
+    const response = await getAPIResponse(["levels", levelID], {});
     const submissions = response.sub;
 
     return submissions;
@@ -415,7 +415,7 @@ export async function getLevelSkillsGDDL(levelID, limit = null) {
  */
 export async function getLevelSkills(levelID, limit = null, APIResponse = null) {
     try {
-        const levelInfo = (APIResponse == null) ? await getAPIResponse(["level", levelID], {}) : APIResponse;
+        const levelInfo = (APIResponse == null) ? await getAPIResponse(["levels", levelID], {}) : APIResponse;
         const skillsMap = new Map(); // each skill by id mapped to num of votes
 
         for (const tag of levelInfo.sk) {

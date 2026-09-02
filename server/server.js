@@ -126,7 +126,7 @@ export async function updateLevelID(levelID, baseData = null) {
     };
 
     if (baseData == null) {
-        const levelBaseData = await getGDDLResponse(["level", levelID], {}); 
+        const levelBaseData = await getGDDLResponse(["levels", levelID], {}); 
         aggregateData.levelID = levelID;
         aggregateData.n = levelBaseData.Meta.Name;
         aggregateData.ec = levelBaseData.EnjoymentCount;

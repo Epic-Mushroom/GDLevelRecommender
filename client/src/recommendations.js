@@ -104,6 +104,7 @@ function calculateSkillMultiplier(levelSkills, mainUserProfile) {
         const maxMultiplier = ((mainUserProfile.skillWeightAggression) ?
             (MAX_SKILL_MATCH_MULTIPLIER * SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_MATCH_MULTIPLIER
         );
+
         const minMultiplier = ((mainUserProfile.skillWeightAggression) ?
             (MAX_SKILL_CONTRAST_MULTIPLIER / SKILL_FIT_AGGRESSION_MULTIPLIER) : MAX_SKILL_CONTRAST_MULTIPLIER
         );
@@ -150,7 +151,7 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     let cumulativeResult = 0;
     const step1Result = STEP_1_WEIGHT_CALC_A * (enjoyment ** 2) + STEP_1_WEIGHT_CALC_B2;
     const compatMultiplier = (adjustedCompat / 100.0) ** STEP_2_WEIGHT_CALC_P2;
-    cumulativeResult += step1Result * compatMultiplier
+    cumulativeResult += step1Result * compatMultiplier;
 
     // skill weighting here
     const skillMultiplier = calculateSkillMultiplier(levelSkills, mainUserProfile);
@@ -159,6 +160,7 @@ export function calculateWeight(enjoyment, rating, levelSkills, minTier, maxTier
     // console.log(`   applied a skill multiplier of ${skillMultiplier} (+${skillWeight}) to this level (${cumulativeResult - skillWeight} -> ${cumulativeResult})`);
 
     if (Math.round(rating) < minTier || Math.round(rating) > maxTier) {
+        
         cumulativeResult *= 1.0 / 999;
     }
 
@@ -184,11 +186,12 @@ export class EnjoymentProfile {
 
     constructor(userID = DEFAULT_USER_ID, username = DEFAULT_USERNAME, isOther = false) {
         this.userID = userID;
-        this.username = username;
+        this.username = username; 
         this.isOther = isOther;
 
-        this.avgEnjoyment = null;
+        this.avgEnjoyment = null; 
 
+    
         this.compat = (!isOther) ? BASE_COMPAT : null;
         this.adjustedCompat = (!isOther) ? 100.0 : null;
 
@@ -212,6 +215,7 @@ export class EnjoymentProfile {
     setSkills(skills2DArr) {
         if (this.isOther) {
             // don't need skills of users other than main one
+            
             return;
         }
 
@@ -229,7 +233,7 @@ export class EnjoymentProfile {
     /**
      * 
      * @returns {[string, number][]}
-     */
+     */ 
     calculateLikedSkills() {
         if (this.likedSkills2DArr.length > 0) {
             return this.likedSkills2DArr;

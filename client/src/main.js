@@ -14,10 +14,10 @@ function tick(numTicks) {
     timeElapsedText.style.setProperty("display", "block");
 
     switch (dataCollection.trackers.progressState) {
-        case dataCollection.PROGRESS.STAGE_1:
+        case dataCollection.PROGRESS.STAGE_1:   
             dataCollection.trackers.progressValue = window.dataManager.mainUserEnjProfile.ratingMap.size;
             progressValueText.textContent = `(${dataCollection.trackers.progressValue})`;
-            break;
+            break; 
         
         case dataCollection.PROGRESS.STAGE_2:
             dataCollection.trackers.progressValue = window.dataManager.otherUserEnjProfileMap.size;
@@ -40,7 +40,7 @@ function tick(numTicks) {
             dataCollection.trackers.progressValue = 0;
             
             progressValueText.textContent = ``;
-            break;
+            break;  
 
     }
 
@@ -50,6 +50,7 @@ function tick(numTicks) {
     // restarts the timer
     setTimeout(() => {
         tick(newTicks);
+
     }, CLIENT_TICK_DELAY);
 }
 
@@ -79,10 +80,10 @@ function startAnimation(element, className, hideOnceFinished = false) {
  */
 function errorMsg(message) {
     errorMessageText.textContent = message;
-    startAnimation(errorMessageText, "display-and-fade-out", true);
-}
+    startAnimation(errorMessageText, "display-and-fade-out", true); 
+} 
 
-function breakDownWeightCalculations(levelWeightInfo) {
+function breakDownWeightCalculations(levelWeightInfo) { 
     const numUsers = levelWeightInfo.numRatings;
     const rawAvgWeight = levelWeightInfo.rawTotalWeight * 1.0 / numUsers;
 
@@ -143,7 +144,7 @@ async function addLevelCard(levelID, levelWeightInfo) {
     const top3Skills = getNBest(skillsArr, 3, (kvp) => -kvp[1]);
     let skillsString = top3Skills.map(elem => mapToSkillName.get(elem[0])).join(", ");
 
-    if (skillsString === "") {
+    if (skillsString === "") { 
         skillsString += "No skills found";
     }
 
@@ -301,7 +302,6 @@ const timeElapsedText = document.getElementById("time-elapsed");
 // element listeners
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
-
     try {
         const formData = purifyFormData(new FormData(form));
     
@@ -319,11 +319,10 @@ export let gradientOnMouseMove = window.addEventListener("mousemove", (event) =>
     // let yPercent = (event.clientY / window.innerHeight) * 100;
 
     targetGradientX = Math.max(Math.min(xPercent, MAX_GRADIENT_DISTANCE), MIN_GRADIENT_DISTANCE)
-})
+});
 
 export let gradientLerp = setInterval(() => {
     const currentGradientX = parseFloat(window.getComputedStyle(root).getPropertyValue("--gradient-midpoint").replace("%", ""));
-
     root.style.setProperty("--gradient-midpoint", `${
         currentGradientX + 0.02 * (targetGradientX - currentGradientX)
     }%`);
