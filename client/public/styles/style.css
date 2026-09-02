@@ -289,6 +289,14 @@ p {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+.stronger-glass {
+  background-color: rgba(255, 254, 254, 0.767);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .blending-shadow {
   text-shadow: 3px 3px 9px rgba(0, 0, 0, 0.15);
 }
@@ -543,6 +551,18 @@ p {
     padding-bottom: 7px;
 }
 
+#info-label {
+  font-size: larger;
+  width: 100%;
+}
+
 #faq {
-  display: none;
+  display: flex;
+  gap: 20px;
+  margin: 0 15px;
+  align-items: flex-start;
+  text-align: left;
+  flex-wrap: wrap;
+
+  padding: 16px;
 }
