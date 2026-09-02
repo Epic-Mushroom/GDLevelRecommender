@@ -57,7 +57,7 @@ const DEFAULT_MAIN_USER_SUBMISSIONS_SORT_DIRECTION = "desc";
 // this value is ONLY used when finding users who share levels in common, NOT at the start to get the main user's submissions
 const MAX_USER_LEVELS_PER_ENJ_RATING = 5;
 // at max how many of the main user's rated levels in total are sent an api request
-const MAX_USER_LEVELS_TOTAL = 54;
+const MAX_USER_LEVELS_TOTAL = 70;
 // at max how many submissions per level to put into dataManager, because getting like 5,000 submissions per level is probably
 // a globillion requests total and we don't want that 
 const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90; 
@@ -65,7 +65,7 @@ const MAX_SUBMISSIONS_TO_TRACK_PER_LEVEL = 90;
 const DEFAULT_SUBMISSIONS_SORT = "enjoyment";
 // up to [this value] users will have their ratings collected
 // this is different from recs.MAX_OTHER_USERS_TO_TRACK since not all users will have their ratings collected
-const MAX_OTHER_USERS_TO_COLLECT_FROM = 82;
+const MAX_OTHER_USERS_TO_COLLECT_FROM = 101;
 // [this value] is added to max tier and subtracted from min tier when searching for levels from other users' pages
 // this is because a user's sent rating is not always the same as the actual rating
 const TIER_RANGE_OFFSET = 4;

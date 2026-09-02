@@ -60,6 +60,8 @@ const STEP_3_WEIGHT_CALC_A = 0.2377;
 const STEP_3_WEIGHT_CALC_A2 = 0.588235294;
 const STEP_3_WEIGHT_CALC_A3 = 1.5;
 const STEP_3_WEIGHT_CALC_A4 = -0.3;
+const STEP_3_WEIGHT_CALC_T1 = 21;
+const STEP_3_WEIGHT_CALC_T2 = 0.15;
 
 /**
  * 
@@ -353,7 +355,7 @@ export class EnjoymentProfile {
             return null;
         }
 
-        const pearsonCoeff = pearsonSimilarity(thisUserEnjoymentArr, mainUserEnjoymentArr);
+        // const pearsonCoeff = pearsonSimilarity(thisUserEnjoymentArr, mainUserEnjoymentArr);
 
         this.compat = ((numCommonLevels >= MIN_NUM_COMMON_LEVELS_FOR_MULTIPLIER) ? HIGH_NUM_COMMON_LEVELS_MULTIPLIER : 1.0) * totalCompat / numCommonLevels;
         return this.compat;
@@ -378,10 +380,6 @@ export class EnjoymentProfile {
             return 0;
         }
 
-        // assumes all compats are already sorted in ascending order
-        const maxCompatValue = dataManager.compatArr[dataManager.compatArr.length - 1];
-        const minCompatValue = dataManager.compatArr[0];
-
         // percentile-based calculation
         // for (let i = 0; i < dataManager.compatArr.length; i++) {
         //     const compatValue = dataManager.compatArr[i];
@@ -392,6 +390,9 @@ export class EnjoymentProfile {
         // }
 
         // ratio-based calculation
+        // assumes all compats are already sorted in ascending order
+        const maxCompatValue = dataManager.compatArr[dataManager.compatArr.length - 1];
+        const minCompatValue = dataManager.compatArr[0];
         this.adjustedCompat = adjustToRange(this.compat, [minCompatValue, maxCompatValue], [0, 100]);
 
         return this.adjustedCompat;
@@ -531,10 +532,20 @@ class DataManager {
         // const newWeight = newRawTotalWeight * 1.0 * (STEP_3_WEIGHT_CALC_B + STEP_3_WEIGHT_CALC_A * Math.log(newNumRatings)) / newNumRatings;
 
         // newer v2 calculation: uses a multiplier defined by exponential decay
-        //const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
+        // const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), newNumRatings) + 1) / newNumRatings;
 
         // newer v3 calculation: see v2 but penalizes low common user count even more
-        const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), (STEP_3_WEIGHT_CALC_A3 * newNumRatings + STEP_3_WEIGHT_CALC_A4)) + 1) / newNumRatings;
+        // const newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), (STEP_3_WEIGHT_CALC_A3 * newNumRatings + STEP_3_WEIGHT_CALC_A4)) + 1) / newNumRatings;
+
+        // newer v4 calculation: see v3 but uses the tier of the level to modify penalization of low common user count
+        // this is because higher tiered levels will generally have fewer victors so they will end up being penalized a lot otherwise
+        const tierRating = levelInfo.actualRating;
+        let newWeight = 0;
+        if (tierRating > STEP_3_WEIGHT_CALC_T1) {
+            newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), ((STEP_3_WEIGHT_CALC_A3 + (tierRating - STEP_3_WEIGHT_CALC_T1) * STEP_3_WEIGHT_CALC_T2) * newNumRatings + STEP_3_WEIGHT_CALC_A4)) + 1) / newNumRatings;
+        } else {
+            newWeight = newRawTotalWeight * (-1.0 * Math.pow((STEP_3_WEIGHT_CALC_A2), (STEP_3_WEIGHT_CALC_A3 * newNumRatings + STEP_3_WEIGHT_CALC_A4)) + 1) / newNumRatings;
+        }
 
         this.levelWeightsMap.set(levelID, {
             rawTotalWeight: newRawTotalWeight, weight: newWeight, numRatings: newNumRatings, 
@@ -547,7 +558,7 @@ class DataManager {
     addAllWeights(minTier = 1, maxTier = 39) {
         for (const otherUserEnjProfile of this.otherUserEnjProfileMap.values()) {
             for (const [levelID, ratingInfo] of otherUserEnjProfile.ratingMap) {
-                if (this.mainUserEnjProfile.adjustedCompat == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
+                if (otherUserEnjProfile.adjustedCompat == null || this.mainUserEnjProfile.isLevelCompleted(levelID)) {
                     continue;
                 }
 
